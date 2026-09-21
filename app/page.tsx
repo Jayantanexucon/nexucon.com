@@ -1,3 +1,6 @@
+import SiteNav from "@/app/components/SiteNav";
+import ContactForm from "@/app/components/ContactForm";
+
 const metrics = [
   ["40%", "COST OPTIMIZATION", "Average delivery overhead reduction"],
   ["72hr", "TIME TO ACCELERATE", "From brief to a working system"],
@@ -32,13 +35,7 @@ function Arrow() {
 export default function Home() {
   return (
     <main className="nexucon-site">
-      <nav className="site-nav" aria-label="Primary navigation">
-        <a href="#top" className="logo-link"><Logo /><small>ENGINEERING THE<br />INTELLIGENT ENTERPRISE</small></a>
-        <div className="nav-links">
-          <a href="#work">Overview</a><a href="#capabilities">Services</a><a href="#approach">AI &amp; Automation</a><a href="#industries">Industries</a>
-        </div>
-        <div className="nav-actions"><a href="#contact">Advisory <span>↗</span><br />Contact</a><a href="#contact" className="nav-cta">Connect with<br />an Architect <Arrow /></a></div>
-      </nav>
+      <SiteNav />
 
       <section id="top" className="hero section-shell">
         <div className="eyebrow"><i /> SYSTEMS THAT SCALE WITH AMBITION <b>01 / 05</b></div>
@@ -67,7 +64,7 @@ export default function Home() {
 
       <section className="quote-band section-shell"><div className="quote-portrait"><div className="portrait-grid" /><span>NX</span><small>NUCLEI / CHEMICAL<br />PLATFORM REFERENCE</small></div><div className="quote-copy"><b>99</b><blockquote>“Nexucon reduced our Azure cloud transformation with zero unplanned downtime across 14 global territories. Their automated orchestration cut our multi-million dollar cloud infrastructure expenditure by 38% in the first quarter alone while drastically improving our end-user experience.”</blockquote><div className="quote-meta"><span>ENTERPRISE SCORE<br /><b>4.8 / 5.0</b></span><span>DELIVERY VELOCITY<br /><b>72hr PODS</b></span><span>DATA SYSTEMS<br /><b>99.98% UPTIME</b></span></div></div></section>
 
-      <section id="contact" className="contact-section section-shell"><div><div className="eyebrow"><i /> OPERATE TOGETHER</div><h2>Consult a Principal<br /><em>Enterprise Architect</em></h2><p>Schedule a 30-minute working session. We will map your bottleneck, your decision horizon, and the fastest path to a system that compounds.</p><div className="contact-details"><a href="mailto:architect@nexucon.com">▣ &nbsp; architect@nexucon.com</a><a href="tel:+442081234567">▣ &nbsp; +44 20 8123 4567</a><a href="#contact">▣ &nbsp; 20 Fenchurch Street, London EC3M</a></div></div><form><div className="form-top"><span>◉ ARCHITECTURE BRIEF / v1.4</span><small>RESPONSE: &lt; 48H</small></div><label>Name<input name="name" placeholder="Your name" /></label><label>Work email<input name="email" type="email" placeholder="you@company.com" /></label><label>Primary system<select name="system" defaultValue=""><option value="" disabled>Select a focus area</option><option>SAP modernization</option><option>AI &amp; data systems</option><option>Cloud infrastructure</option></select></label><label>What are you solving?<textarea name="message" rows={3} placeholder="Tell us where the system is under pressure..." /></label><button type="button" className="button button-primary">Dispatch Architecture Consultation <Arrow /></button></form></section>
+      <section id="contact" className="contact-section section-shell"><div><div className="eyebrow"><i /> OPERATE TOGETHER</div><h2>Consult a Principal<br /><em>Enterprise Architect</em></h2><p>Schedule a 30-minute working session. We will map your bottleneck, your decision horizon, and the fastest path to a system that compounds.</p><div className="contact-details"><a href="mailto:architect@nexucon.com">▣ &nbsp; architect@nexucon.com</a><a href="tel:+442081234567">▣ &nbsp; +44 20 8123 4567</a><a href="#contact">▣ &nbsp; 20 Fenchurch Street, London EC3M</a></div></div><ContactForm /></section>
 
       <footer className="site-footer section-shell"><div><a href="#top" className="logo-link"><Logo /></a><p>High-performance enterprise systems for a world that moves at machine speed.</p><small>© 2026 Nexucon. All systems operational.</small></div><div><b>PRACTICE DOMAINS</b><a href="#capabilities">SAP &amp; ERP</a><a href="#capabilities">AI &amp; Data</a><a href="#capabilities">Cloud Systems</a></div><div><b>ENTERPRISE COMPLIANCE</b><a href="#contact">ISO 27001 · SOC 2</a><a href="#contact">GDPR · Zero Trust</a><a href="#contact">Security protocols</a></div><div><b>GLOBAL HEADQUARTERS</b><span>London · New York · Singapore</span><span>24/7 Operations Network</span></div></footer>
     </main>
