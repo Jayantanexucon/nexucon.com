@@ -3,13 +3,17 @@
 **Document Reference:** NEX-API-DEC-v1.0  
 **Project:** Nexucon Company Website, Careers Engine & Marketing CMS Platform  
 **Target Release:** Production Launch (Releases 1, 2, 3)  
+**Status:** Draft for Backend, Frontend, Integration, Security, and QA Review  
 **Security Level:** Internal Engineering Architecture Register  
 
 ---
 
 ## Executive Overview
 
-This register formally captures the 20 fundamental architectural, technical, integration, and security decisions governing the Nexucon Website, Marketing CMS, Careers Subsystem, and external enterprise system connectors. Each entry documents the context, evaluated alternatives, engineering trade-offs, final recommendation, governance status, decision owner, and impacted API components.
+This register formally captures the 20 fundamental architectural, technical, integration, and security decisions governing the Nexucon Website, Marketing CMS, Careers Subsystem, and external enterprise system connectors. Each entry documents the technical context, evaluated alternatives, engineering trade-offs, architect's recommendation, current governance status, decision owner, and impacted API components.
+
+> [!IMPORTANT]
+> **Governance Notice:** In accordance with the Project Governance Framework, all architectural decisions documented herein remain in **`[PROPOSED]`** or **`[TBD WITH OWNER]`** review status until formally approved by respective enterprise stakeholders. Only behaviors directly inspected in the legacy codebase carry the baseline designation **`[VERIFIED-AS-IS]`**. No API contract is deemed finalized until its corresponding decision register entry receives executive sign-off.
 
 ---
 
@@ -17,26 +21,26 @@ This register formally captures the 20 fundamental architectural, technical, int
 
 | Decision ID | Area | Title | Status | Recommendation | Owner |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **DEC-API-01** | Architecture | ATS System of Record vs Careers Portal DB | `[APPROVED-TARGET]` | Dual-tier: ATS is Master; Careers DB is read cache + ingestion buffer | Integration Architect |
-| **DEC-API-02** | Integration | ATS Requisition Sync: Push Webhook vs Pull Polling | `[APPROVED-TARGET]` | Primary: Push Webhook (HMAC-SHA256); Secondary: Daily Cron Reconciliation | Integration Architect |
-| **DEC-API-03** | Integration | Corporate CRM Endpoint Path & Network Boundary | `[APPROVED-TARGET]` | Azure Private Endpoint / VNet Integration with outbound REST Gateway | Cloud Security Architect |
-| **DEC-API-04** | Infrastructure| Rate Limiting Engine & Shared State Store | `[APPROVED-TARGET]` | Cloudflare Edge WAF (Tier 1) + Azure Cache for Redis (Tier 2 BFF) | Principal Architect |
-| **DEC-API-05** | Careers / Security | Resume File Size, Formats & Magic Byte Validation | `[APPROVED-TARGET]` | 5 MB maximum; PDF and DOCX only; in-memory magic-byte verification | Security Architect |
-| **DEC-API-06** | Identity / Auth | Administrative Identity: Entra ID vs Strapi Native | `[APPROVED-TARGET]` | Hybrid: Microsoft Entra ID (SSO) for internal staff; Strapi Native for CMS roles | Security Architect |
-| **DEC-API-07** | CMS Protocol | Strapi 5 Content Consumption: REST vs GraphQL | `[APPROVED-TARGET]` | REST API with selective `populate` & `fields` filters for RSC | Senior Frontend Lead |
-| **DEC-API-08** | Caching / Delivery | Next.js Page Generation: Tag ISR vs Static Export | `[APPROVED-TARGET]` | Next.js Tag-based Incremental Static Regeneration (ISR) | Senior Frontend Lead |
-| **DEC-API-09** | Security / Storage | Private Resume Storage & SAS Download Security | `[APPROVED-TARGET]` | Azure Blob Private Container + 15-minute User Delegation SAS URLs | Security Architect |
-| **DEC-API-10** | Anti-Bot Defense | Bot Mitigation: Cloudflare Turnstile Integration | `[VERIFIED-AS-IS]` | Cloudflare Turnstile widget with mandatory server-side verification | Principal Architect |
-| **DEC-API-11** | Resilience | Inbound Lead Dispatch: Transactional Outbox Pattern | `[APPROVED-TARGET]` | Transactional Outbox in PostgreSQL with asynchronous exponential worker | Backend Engineer |
-| **DEC-API-12** | Decommissioning | Legacy Route Retirement: HTTP 410 Gone vs 308 Redirect | `[APPROVED-TARGET]` | 308 Permanent Redirect for `/api/enquiries`; 410 Gone for all prototype admin/auth | Lead Backend Architect |
-| **DEC-API-13** | Data Standard | Phone & Country Ingestion: E.164 International Format | `[APPROVED-TARGET]` | E.164 phone standard validated via `libphonenumber` + ISO 3166-1 alpha-2 | Fullstack Lead |
-| **DEC-API-14** | Marketing / CRM | SAP Consultation & Lead Enrichment Attribution | `[APPROVED-TARGET]` | Normalized UTM parameter capture + GTM dataLayer event triggers | Marketing Technologist |
-| **DEC-API-15** | Careers Policy | Candidate Application Duplicate Window Policy | `[APPROVED-TARGET]` | 30-day duplicate application lock per email + job requisition | Recruitment Operations Lead |
-| **DEC-API-16** | CMS Media | Public Media Storage: Azure Blob Storage Provider | `[APPROVED-TARGET]` | Strapi Azure Blob Storage Provider for all public images & documents | Cloud DevOps Lead |
-| **DEC-API-17** | Security / Auth | Webhook Security: ATS Signature Verification | `[APPROVED-TARGET]` | HMAC-SHA256 signature in `X-Nexucon-ATS-Signature` header + timestamp skew | Security Engineer |
-| **DEC-API-18** | CMS Workflow | Next.js Draft Mode Preview Architecture | `[APPROVED-TARGET]` | `draftMode().enable()` via secure one-time secret query parameter | Senior Frontend Lead |
-| **DEC-API-19** | SEO | Structured Data (JSON-LD) for Job Requisitions | `[APPROVED-TARGET]` | Schema.org `JobPosting` structured JSON-LD embedded on job detail pages | SEO / Technical Lead |
-| **DEC-API-20** | Telemetry | Telemetry Architecture: GA4 + App Insights vs DB | `[APPROVED-TARGET]` | Decommission DB analytics; use GA4 via GTM (client) & App Insights (server) | Analytics Architect |
+| **DEC-API-01** | Architecture | ATS System of Record vs Careers Portal DB | `[PROPOSED]` | Dual-tier: ATS is Master; Careers DB is read cache + ingestion buffer | Integration Architect |
+| **DEC-API-02** | Integration | ATS Requisition Sync: Push Webhook vs Pull Polling | `[PROPOSED]` | Primary: Push Webhook (HMAC-SHA256); Secondary: Daily Reconciliation Cron | Integration Architect |
+| **DEC-API-03** | Integration | Corporate CRM Endpoint Path & Network Boundary | `[PROPOSED]` | Azure Private Endpoint / VNet Integration with outbound REST Gateway | Cloud Security Architect |
+| **DEC-API-04** | Infrastructure| Rate Limiting Engine & Shared State Store | `[PROPOSED]` | Cloudflare Edge WAF (Tier 1) + Azure Cache for Redis (Tier 2 BFF) | Principal Architect |
+| **DEC-API-05** | Careers / Security | Resume File Size, Formats & Magic Byte Validation | `[PROPOSED]` | 5 MB maximum (expanded from 4 MB legacy); PDF/DOCX; magic-byte verification | Security Architect |
+| **DEC-API-06** | Identity / Auth | Administrative Identity: Entra ID vs Strapi Native | `[PROPOSED]` | Hybrid: Microsoft Entra ID (SSO) for internal staff; Strapi Native for CMS roles | Security Architect |
+| **DEC-API-07** | CMS Protocol | Strapi 5 Content Consumption: REST vs GraphQL | `[PROPOSED]` | REST API with selective `populate` & `fields` filters for RSC | Senior Frontend Lead |
+| **DEC-API-08** | Caching / Delivery | Next.js Page Generation: Tag ISR vs Static Export | `[PROPOSED]` | Next.js Tag-based Incremental Static Regeneration (ISR) | Senior Frontend Lead |
+| **DEC-API-09** | Security / Storage | Private Resume Storage & SAS Download Security | `[PROPOSED]` | Azure Blob Private Container + 15-minute User Delegation SAS URLs | Security Architect |
+| **DEC-API-10** | Anti-Bot Defense | Bot Mitigation: Cloudflare Turnstile Integration | `[VERIFIED-AS-IS / PROPOSED]` | Cloudflare Turnstile widget with mandatory server-side verification | Principal Architect |
+| **DEC-API-11** | Resilience | Inbound Lead Dispatch: Transactional Outbox Pattern | `[PROPOSED]` | Transactional Outbox in PostgreSQL with asynchronous exponential worker | Backend Engineer |
+| **DEC-API-12** | Decommissioning | Legacy Route Retirement: HTTP 410 Gone vs 308 Redirect | `[PROPOSED]` | 308 Permanent Redirect for `/api/enquiries`; 410 Gone for prototype admin/auth | Lead Backend Architect |
+| **DEC-API-13** | Data Standard | Phone & Country Ingestion: E.164 International Format | `[PROPOSED]` | E.164 phone standard validated via `libphonenumber` + ISO 3166-1 alpha-2 | Fullstack Lead |
+| **DEC-API-14** | Marketing / CRM | SAP Consultation & Lead Enrichment Attribution | `[PROPOSED]` | Normalized UTM parameter capture + GTM dataLayer event triggers | Marketing Technologist |
+| **DEC-API-15** | Careers Policy | Candidate Application Duplicate Window Policy | `[PROPOSED]` | 30-day duplicate application lock per email + job requisition | Recruitment Operations Lead |
+| **DEC-API-16** | CMS Media | Public Media Storage: Azure Blob Storage Provider | `[PROPOSED]` | Strapi Azure Blob Storage Provider for all public images & documents | Cloud DevOps Lead |
+| **DEC-API-17** | Security / Auth | Webhook Security: ATS Signature Verification | `[PROPOSED]` | HMAC-SHA256 signature in `X-Nexucon-ATS-Signature` header + timestamp skew | Security Engineer |
+| **DEC-API-18** | CMS Workflow | Next.js Draft Mode Preview Architecture | `[PROPOSED]` | `draftMode().enable()` via secure one-time secret query parameter | Senior Frontend Lead |
+| **DEC-API-19** | SEO | Structured Data (JSON-LD) for Job Requisitions | `[PROPOSED]` | Schema.org `JobPosting` structured JSON-LD embedded on job detail pages | SEO / Technical Lead |
+| **DEC-API-20** | Telemetry | Telemetry Architecture: GA4 + App Insights vs DB | `[PROPOSED]` | Decommission DB analytics; use GA4 via GTM (client) & App Insights (server) | Analytics Architect |
 
 ---
 
@@ -56,7 +60,7 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Option 2 guarantees sub-100ms job listing loads, zero downtime during ATS maintenance, and eliminates ATS credential exposure to the public web.
   - Option 3 creates data duplication, recruiter overhead, and candidate synchronization divergence.
 * **Architect Recommendation:** **Option 2 (Dual-Tier Master-Cache Architecture)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending formal written confirmation from ATS Technical Owner)*.
 * **Owner:** Integration Architect & ATS Product Owner
 * **Impacted Endpoints:** `GET /api/careers/jobs`, `GET /api/careers/jobs/[slug]`, `POST /api/careers/apply`, `POST /api/integrations/ats/jobs`.
 
@@ -74,7 +78,7 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Option 2 provides sub-second update speed with minimal compute overhead.
   - Option 3 combines instant updates with automated failure recovery if a webhook is missed due to temporary network partitions.
 * **Architect Recommendation:** **Option 3 (Hybrid: Webhook Primary + Daily Reconciliation Polling)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending confirmation of ATS webhook dispatch capability)*.
 * **Owner:** Integration Architect
 * **Impacted Endpoints:** `POST /api/integrations/ats/jobs`, `cron:reconcile-ats-requisitions`.
 
@@ -92,7 +96,7 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Option 2 leverages native Azure enterprise security boundaries, eliminates egress internet exposure, and guarantees sub-5ms network latency.
   - Option 3 adds operational complexity and third-party dependency.
 * **Architect Recommendation:** **Option 2 (Azure VNet Integration with Private DNS & Key Vault Managed API Key)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending CRM Infrastructure Team network review)*.
 * **Owner:** Cloud Security Architect & CRM Systems Lead
 * **Impacted Endpoints:** `POST /api/leads`, outbound CRM REST gateway adapter.
 
@@ -110,7 +114,7 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Option 2 provides accurate cluster-wide tracking but incurs compute costs on Next.js instances for volumetric attacks.
   - Option 3 stops malicious floods at the edge before consuming Azure compute, while enforcing precise business constraints in the BFF.
 * **Architect Recommendation:** **Option 3 (Two-Tier Defense: Cloudflare WAF + Azure Cache for Redis sliding-window)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Cost approval required for Azure Redis Standard C0/C1 instance)*.
 * **Owner:** Principal Architect & DevOps Lead
 * **Impacted Endpoints:** All `/api/*` Route Handlers.
 
@@ -118,23 +122,23 @@ This register formally captures the 20 fundamental architectural, technical, int
 
 ### DEC-API-05: Resume File Size, Formats & Magic Byte Validation
 
-* **Context:** The legacy careers SPA (`Nexucon-Main-Page/careers`) allowed only `.pdf` files with a 4 MB ceiling. The target platform must balance recruiter document requirements with anti-malware and storage constraints.
+* **Context:** The legacy careers SPA (`Nexucon-Main-Page/careers`) allowed only `.pdf` files with a strict 4 MB (4,194,304 bytes) limit `[VERIFIED-AS-IS]`. The target platform must balance recruiter document requirements with anti-malware and storage constraints.
 * **Options Considered:**
-  1. *Preserve Legacy:* `.pdf` only, maximum 4,194,304 bytes (4 MB).
-  2. *Modern Enterprise Standard:* `.pdf` and `.docx` supported; maximum 5,242,880 bytes (5 MB); enforce in-memory binary magic-byte inspection.
+  1. *Preserve Legacy Baseline:* `.pdf` only, maximum 4,194,304 bytes (4 MB).
+  2. *Proposed Target Expansion:* Support `.pdf` and `.docx`; expand limit to 5,242,880 bytes (5 MB); enforce in-memory binary magic-byte inspection (`%PDF-` and `PK\x03\x04`).
   3. *Unrestricted Formats:* Allow `.pdf`, `.docx`, `.doc`, `.rtf`, `.txt`, `.pages` up to 15 MB.
 * **Evaluation:**
   - Option 1 restricts candidates who maintain formatted Word resumes.
   - Option 2 accommodates 99.8% of modern candidate resumes while blocking legacy executable formats (`.doc` macros) and large binary files. Magic-byte verification prevents extension renaming attacks.
   - Option 3 exposes the platform to macro-based viruses and excessive storage costs.
-* **Architect Recommendation:** **Option 2 (.pdf and .docx only, 5 MB limit, strict magic-byte validation: `%PDF-` and `PK\x03\x04`)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Architect Recommendation:** **Option 2 (.pdf and .docx only, 5 MB limit, strict magic-byte validation)**.
+* **Decision Status:** `[PROPOSED]` *(Baseline is 4 MB PDF; expansion to 5 MB / DOCX requires Recruitment Operations sign-off)*.
 * **Owner:** Security Architect & Recruitment Operations Lead
 * **Impacted Endpoints:** `POST /api/careers/apply`.
 
 ---
 
-### DEC-API-06: Administrative Identity: Entra ID vs Strapi Native
+### DEC-API-06: Administrative Identity: Entra ID vs Strapi Native & RBAC Registry
 
 * **Context:** Nexucon requires administrative access for marketing content authors (Strapi CMS) and internal HR/recruitment teams (Careers Dashboard).
 * **Options Considered:**
@@ -146,7 +150,13 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Option 2 does not support corporate MFA policies, offboarding hooks, or unified access auditing.
   - Option 3 integrates directly with corporate IT directory, automates onboarding/offboarding, and enforces MFA.
 * **Architect Recommendation:** **Option 3 (Microsoft Entra ID SSO for all administrative roles; decommission custom login API)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Formal RBAC Role Definitions:**
+  - `Nexucon.Recruiter`: Authorized to view applications and generate 15-minute SAS resume download URLs.
+  - `Nexucon.RecruitmentAdmin`: Full administrative control over careers pipelines, recruiter assignments, and data retention purges.
+  - `Nexucon.MarketingEditor`: Authorized to create, edit, and preview draft content in Strapi CMS.
+  - `Nexucon.MarketingAdmin`: Authorized to publish, archive, and manage site global settings and vanity redirects.
+  - `Nexucon.TechnicalAdmin`: Azure App Service and Key Vault infrastructure maintenance.
+* **Decision Status:** `[PROPOSED]` *(Pending Azure AD Tenant administrative federation)*.
 * **Owner:** Security Architect & IT Operations Lead
 * **Impacted Endpoints:** Decommission `POST /api/auth/login`, `POST /api/auth/logout`, `POST /admin/create-user`.
 
@@ -163,7 +173,7 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Strapi 5 REST API integrates natively with Next.js `fetch` caching and tag-based ISR (`next: { tags: [...] }`).
   - GraphQL introduces additional bundle overhead, requires custom caching wrappers for Next.js 16/React 19 Server Components, and complicates HTTP edge caching.
 * **Architect Recommendation:** **Option 1 (Strapi 5 REST Content API with explicit `fields` and `populate` parameters)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending frontend lead benchmarking against Strapi 5 release)*.
 * **Owner:** Senior Frontend Lead
 * **Impacted Endpoints:** `GET /api/pages`, `GET /api/services`, `GET /api/blogs`, `GET /api/global-setting`.
 
@@ -181,7 +191,7 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Option 2 increases server load and TTFB, negatively impacting Core Web Vitals.
   - Option 3 delivers edge-cached static speeds (sub-100ms TTFB) with instant updates via webhooks.
 * **Architect Recommendation:** **Option 3 (Tag-Based Incremental Static Regeneration)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending end-to-end webhook validation)*.
 * **Owner:** Senior Frontend Lead & Principal Architect
 * **Impacted Endpoints:** `POST /api/revalidate`.
 
@@ -199,7 +209,7 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Option 2 causes severe database bloat and degrades database backup/restore operations.
   - Option 3 isolates candidate files, guarantees full access logging in Azure Storage telemetry, and strictly bounds link validity.
 * **Architect Recommendation:** **Option 3 (Private Azure Blob Storage with 15-minute User Delegation SAS URLs)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending Security Review of User Delegation Key permissions)*.
 * **Owner:** Security Architect & Database Architect
 * **Impacted Endpoints:** `POST /api/careers/apply`, `GET /api/careers/admin/applications/[id]/resume-url`.
 
@@ -210,12 +220,12 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Context:** Web forms (`/contact`, `/sap-business-one`, `/careers`) require automated bot defense without degrading user conversion through annoying CAPTCHA image challenges.
 * **Options Considered:**
   1. *Google reCAPTCHA v2 / v3:* Checkbox or invisible scoring.
-  2. *Cloudflare Turnstile:* Privacy-first, CAPTCHA-free smart challenge. Verified in existing legacy website codebase (`0x4AAAAAAEzj0TBy47cuNvYY`).
+  2. *Cloudflare Turnstile:* Privacy-first, CAPTCHA-free smart challenge. Verified in existing legacy website codebase (`0x4AAAAAAEzj0TBy47cuNvYY`) `[VERIFIED-AS-IS]`.
   3. *Custom Mathematical / Honeypot Captcha only:* Rely exclusively on form traps.
 * **Evaluation:**
-  - Cloudflare Turnstile is already established, tested, and approved in the legacy website. It does not harvest user data or track across sites.
+  - Cloudflare Turnstile is already established, tested, and operational in the legacy website. It does not harvest user data or track across sites.
 * **Architect Recommendation:** **Option 2 (Cloudflare Turnstile verified server-side via `POST https://challenges.cloudflare.com/turnstile/v0/siteverify`)**.
-* **Decision Status:** `[VERIFIED-AS-IS]` (Retained as `[APPROVED-TARGET]`)
+* **Decision Status:** `[VERIFIED-AS-IS / PROPOSED]` *(Implementation verified in legacy HTML forms; target server verification proposed)*.
 * **Owner:** Principal Architect & Frontend Lead
 * **Impacted Endpoints:** `POST /api/leads`, `POST /api/careers/apply`.
 
@@ -233,7 +243,7 @@ This register formally captures the 20 fundamental architectural, technical, int
   - Option 2 loses leads if the Node.js process crashes or restarts before completion.
   - Option 3 provides a 100% guarantee against commercial lead loss (zero-loss guarantee).
 * **Architect Recommendation:** **Option 3 (Transactional Outbox Pattern with durable retry queue)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending DB schema sign-off and CRM integration SLA review)*.
 * **Owner:** Senior Backend Engineer & Integration Architect
 * **Impacted Endpoints:** `POST /api/leads`, Outbound CRM REST adapter.
 
@@ -248,7 +258,7 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - Explicit HTTP 410 and 308 status codes provide clear diagnostic signals to web clients, crawlers, and legacy integrations.
 * **Architect Recommendation:** **Option 2 (308 Redirect for `/api/enquiries` to `/api/leads`; 410 Gone for prototype endpoints)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending release schedule approval)*.
 * **Owner:** Lead Backend Architect
 * **Impacted Endpoints:** All legacy prototype routes.
 
@@ -263,7 +273,7 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - E.164 guarantees direct CRM tele-dialer compatibility and geographic routing.
 * **Architect Recommendation:** **Option 2 (Strict E.164 format with ISO 3166-1 alpha-2 country code)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending CRM inbound schema confirmation)*.
 * **Owner:** Fullstack Lead
 * **Impacted Endpoints:** `POST /api/leads`, `POST /api/careers/apply`.
 
@@ -278,7 +288,7 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - Attribution tracking provides ROI metrics for digital advertising spend on LinkedIn and Google Ads.
 * **Architect Recommendation:** **Option 2 (Structured `attribution` payload schema + GTM `sap_demo_request_success` event)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending Digital Marketing Lead sign-off on UTM naming taxonomy)*.
 * **Owner:** Marketing Technologist & Integration Architect
 * **Impacted Endpoints:** `POST /api/leads`.
 
@@ -294,7 +304,7 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - A 30-day deduplication window prevents spam and accidental double-clicks while permitting re-application after a reasonable time.
 * **Architect Recommendation:** **Option 2 (30-day deduplication lock based on SHA-256 hash of email + jobId)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending Recruitment Operations approval of 30-day window)*.
 * **Owner:** Recruitment Operations Lead
 * **Impacted Endpoints:** `POST /api/careers/apply`.
 
@@ -309,7 +319,7 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - Blob storage provides 99.999999999% (11 9s) durability, zero server disk consumption, and native CDN caching.
 * **Architect Recommendation:** **Option 2 (Strapi Azure Blob Storage Provider with CDN acceleration)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending Azure storage account provisioning)*.
 * **Owner:** Cloud DevOps Lead
 * **Impacted Endpoints:** Strapi `POST /api/upload`.
 
@@ -325,7 +335,7 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - HMAC-SHA256 prevents replay attacks, tamper attacks, and credential sniffing.
 * **Architect Recommendation:** **Option 3 (HMAC-SHA256 signature + 300s timestamp tolerance)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending ATS engineering capability to sign payloads with HMAC-SHA256)*.
 * **Owner:** Security Engineer & Integration Architect
 * **Impacted Endpoints:** `POST /api/integrations/ats/jobs`.
 
@@ -340,7 +350,7 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - Next.js Draft Mode allows instant, secure previews on the production site without deploying separate staging environments.
 * **Architect Recommendation:** **Option 2 (Next.js Draft Mode via secure preview route handler)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending Strapi preview button customization plugin setup)*.
 * **Owner:** Senior Frontend Lead
 * **Impacted Endpoints:** `GET /api/draft`.
 
@@ -355,7 +365,7 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - Structured JSON-LD is the required industry standard for Google for Jobs indexing.
 * **Architect Recommendation:** **Option 2 (Schema.org `JobPosting` JSON-LD generated server-side)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending SEO review of field mappings)*.
 * **Owner:** SEO / Technical Lead
 * **Impacted Endpoints:** `GET /api/careers/jobs/[slug]`.
 
@@ -370,6 +380,15 @@ This register formally captures the 20 fundamental architectural, technical, int
 * **Evaluation:**
   - GA4 provides advanced marketing attribution and funnel analysis; Application Insights provides distributed tracing, exception alerts, and performance metrics without adding database load.
 * **Architect Recommendation:** **Option 2 (Enterprise Telemetry Stack; deprecate custom analytics API)**.
-* **Decision Status:** `[APPROVED-TARGET]`
+* **Decision Status:** `[PROPOSED]` *(Pending GTM container provisioning and privacy policy update)*.
 * **Owner:** Analytics Architect & Lead DevOps Engineer
 * **Impacted Endpoints:** Decommission `POST /api/analytics`.
+
+---
+
+## 3. Change Log & Revision History
+
+| Version | Date | Author | Description of Changes |
+| :--- | :--- | :--- | :--- |
+| **v1.0** | 2026-09-23 | Principal API Architect | Initial Decision Register drafting with 20 architectural records. |
+| **v1.1** | 2026-09-23 | Principal API Architect | **Contract Consistency Review & Reconciliation:**<br>1. Updated document status to `Draft for Backend, Frontend, Integration, Security, and QA Review`.<br>2. Reclassified all 20 decision statuses from `[APPROVED-TARGET]` to `[PROPOSED]` or `[TBD WITH OWNER]` to enforce project governance rules.<br>3. Documented legacy baseline (4 MB PDF) vs proposed target (5 MB PDF/DOCX) in DEC-API-05.<br>4. Defined explicit RBAC Role Definitions (`Nexucon.Recruiter`, `Nexucon.RecruitmentAdmin`, `Nexucon.MarketingEditor`, `Nexucon.MarketingAdmin`, `Nexucon.TechnicalAdmin`) in DEC-API-06.<br>5. Explicitly noted external integration dependencies on ATS and CRM technical owners. |

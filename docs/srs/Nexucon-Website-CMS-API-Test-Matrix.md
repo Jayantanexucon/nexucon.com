@@ -3,6 +3,7 @@
 **Document Reference:** NEX-API-TST-v1.0  
 **Project:** Nexucon Company Website, Careers Engine & Marketing CMS Platform  
 **Target Release:** Production Launch (Releases 1, 2, 3)  
+**Status:** Draft for Backend, Frontend, Integration, Security, and QA Review  
 **Standard Response Contract:** Enforced  
 **QA Lead:** QA Automation Lead & Senior Backend Engineer  
 
@@ -20,10 +21,11 @@ This test matrix defines the comprehensive validation suite for all public Route
 5. **Idempotency & Concurrency:** Duplicate submissions, double-clicks, and replay attack prevention.
 6. **Rate Limiting & Throttling:** Quota exhaustion on public forms and burst protection on webhooks.
 7. **Downstream Failure & Resilience:** Outbox fallback when CRM is unavailable, graceful degradation when Strapi is down, and storage timeout handling.
+8. **Compliance & Performance SLA Testing:** Private storage isolation, 60-minute draft preview cookie expiration, sub-1,500ms cache revalidation, sub-500ms edge TTFB, and 180-day GDPR data retention purging.
 
 ---
 
-## 2. API Test Matrix
+## 2. API Test Matrix (45 Test Scenarios)
 
 | Test ID | Endpoint & Method | Scenario Description | Test Type | Input Conditions | Expected HTTP | Expected Response / Behavior Assertion | Severity | Target Automation |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -31,9 +33,9 @@ This test matrix defines the comprehensive validation suite for all public Route
 | **TC-LEAD-002** | `POST /api/leads` | SAP consultation submission with UTM attribution | Functional | Full SAP payload with company size, city, complete `attribution` object | `201 Created` | Lead saved with attribution; status `RECEIVED` | High | Automated (Supertest) |
 | **TC-LEAD-003** | `POST /api/leads` | Missing Cloudflare Turnstile token | Security / Negative | Payload with valid fields but omitted `turnstileToken` | `400 Bad Request` | `{ success: false, errors: [{ code: "LEAD-TURNSTILE-MISSING-001" }] }` | Critical | Automated (Supertest) |
 | **TC-LEAD-004** | `POST /api/leads` | Invalid / forged Turnstile token | Security | Fake Turnstile token string (`"fake_token_123"`) | `403 Forbidden` | Server fails validation against Cloudflare API; returns `LEAD-TURNSTILE-FAILED-002` | Critical | Automated (Supertest with WireMock) |
-| **TC-LEAD-005** | `POST /api/leads` | Honeypot field filled by bot | Security / Anti-Spam | Populated `website_url` or `fax_number` | `200 OK` (Silent Drop) | Response returns simulated success; no record inserted in database | High | Automated (Supertest) |
+| **TC-LEAD-005** | `POST /api/leads` | Honeypot field filled by bot | Security / Anti-Spam | Populated `_honeypotWebsite` or `_honeypotFax` | `200 OK` (Silent Drop) | Response returns simulated success; no record inserted in database | High | Automated (Supertest) |
 | **TC-LEAD-006** | `POST /api/leads` | Invalid RFC 5322 email format | Negative | `email: "not-an-email@"` | `400 Bad Request` | `{ success: false, errors: [{ field: "email", code: "LEAD-EMAIL-INVALID-005" }] }` | Medium | Automated (Supertest) |
-| **TC-LEAD-007** | `POST /api/leads` | Invalid phone number format | Boundary / Negative| `phone: "12345"` (Not valid E.164) | `400 Bad Request` | Error identifies phone field failure | Medium | Automated (Supertest) |
+| **TC-LEAD-007** | `POST /api/leads` | Invalid phone number format | Boundary / Negative| `phone: "12345"` (Not valid E.164) | `400 Bad Request` | Error identifies phone field failure (`LEAD-PHONE-INVALID-006`) | Medium | Automated (Supertest) |
 | **TC-LEAD-008** | `POST /api/leads` | Message exceeds maximum 2000 chars | Boundary | String of 2,001 characters in `message` | `400 Bad Request` | Error code `LEAD-MESSAGE-TOO-LONG-009` | Low | Automated (Supertest) |
 | **TC-LEAD-009** | `POST /api/leads` | Duplicate submission within 5-min window | Idempotency | Identical payload submitted 2 seconds apart | `409 Conflict` | Error code `LEAD-DUPLICATE-DETECTED-010`; single DB entry | High | Automated (Supertest) |
 | **TC-LEAD-010** | `POST /api/leads` | Rate limit breached (> 5 req / 10 min) | Rate Limiting | 6 consecutive requests from same IP in 1 minute | `429 Too Many Requests` | Header `Retry-After` present; error code `COM-RATE-LIMIT-010` | High | Automated (k6 Load Test) |
@@ -50,9 +52,9 @@ This test matrix defines the comprehensive validation suite for all public Route
 | **TC-CAR-009** | `POST /api/careers/apply`| Executable renamed to .pdf (Magic byte check) | Security | `.exe` file renamed to `resume.pdf` | `415 Unsupported Media Type` | Magic byte mismatch detected; error `CAR-RESUME-MAGIC-BYTE-007` | Critical | Automated (Supertest) |
 | **TC-CAR-010** | `POST /api/careers/apply`| Duplicate candidate application (< 30 days) | Idempotency | Same candidate email applying to same `jobId` twice | `409 Conflict` | Error code `CAR-DUPLICATE-APP-010` | High | Automated (Supertest) |
 | **TC-CAR-011** | `POST /api/careers/apply`| Application for closed job requisition | Business Negative | Valid application targeting job with status `CLOSED` | `410 Gone` | Error code `CAR-JOB-CLOSED-002` | Medium | Automated (Supertest) |
-| **TC-CAR-012** | `GET /api/careers/admin/applications/[id]/resume-url` | Generate SAS download URL with Recruiter role | Functional / Auth | Valid session cookie with role `Recruiter` | `200 OK` | Valid Azure SAS URL returned; expires in 15 minutes | High | Automated (Authenticated Supertest) |
+| **TC-CAR-012** | `GET /api/careers/admin/applications/[id]/resume-url` | Generate SAS download URL with Recruiter role | Functional / Auth | Valid session cookie with role `Nexucon.Recruiter` | `200 OK` | Valid Azure SAS URL returned; expires in 15 minutes | High | Automated (Authenticated Supertest) |
 | **TC-CAR-013** | `GET /api/careers/admin/applications/[id]/resume-url` | Unauthenticated request for candidate resume | Security | Request without valid Entra ID session | `401 Unauthorized` | Error code `COM-AUTH-MISSING-003` | Critical | Automated (Supertest) |
-| **TC-CAR-014** | `GET /api/careers/admin/applications/[id]/resume-url` | Non-recruiter user role (e.g. Marketing Editor)| Security | Valid session with role `Marketing_Editor` | `403 Forbidden` | Access denied; error code `CAR-SAS-UNAUTHORIZED-011` | Critical | Automated (Supertest) |
+| **TC-CAR-014** | `GET /api/careers/admin/applications/[id]/resume-url` | Non-recruiter user role (e.g. Marketing Editor)| Security | Valid session with role `Nexucon.MarketingEditor` | `403 Forbidden` | Access denied; error code `CAR-SAS-UNAUTHORIZED-011` | Critical | Automated (Supertest) |
 | **TC-REV-001** | `POST /api/revalidate` | Valid Strapi entry publish webhook | Functional | Valid `Authorization: Bearer <secret>`, payload: `{ model: "service", entry: { slug: "sap" } }` | `200 OK` | Next.js tag cache revalidated; returns `{ revalidated: true }` | High | Automated (Supertest) |
 | **TC-REV-002** | `POST /api/revalidate` | Invalid revalidation bearer token | Security | Request with incorrect authorization token | `401 Unauthorized` | Error code `CMS-REV-SECRET-INVALID-004` | Critical | Automated (Supertest) |
 | **TC-REV-003** | `POST /api/revalidate` | Missing payload model / tags | Negative | `{}` empty JSON body | `400 Bad Request` | Error code `CMS-REV-TAG-MISSING-005` | Medium | Automated (Supertest) |
@@ -64,6 +66,14 @@ This test matrix defines the comprehensive validation suite for all public Route
 | **TC-LEG-001** | `POST /api/auth/login` | Access deprecated prototype login route | Regression / Lifecycle | Arbitrary credentials posted to old route | `410 Gone` | Error code `LEGACY-AUTH-DISABLED-001` | High | Automated (Supertest) |
 | **TC-LEG-002** | `POST /api/enquiries` | Legacy contact route invocation | Regression / Redirect | Legacy enquiry payload posted to `/api/enquiries` | `308 Permanent Redirect`| Redirect header points to `/api/leads` | High | Automated (Supertest) |
 | **TC-LEG-003** | `POST /api/upload` | Deprecated local file upload endpoint | Regression / Security | Multipart file posted to old upload route | `410 Gone` | Error code `LEGACY-UPLOAD-DISABLED-004`; no file written | High | Automated (Supertest) |
+| **TC-SEC-001** | `GET /resumes-private/{blobPath}` | Direct anonymous HTTP GET to private resume blob | Security / Storage Isolation | Unauthenticated direct browser GET request to Azure Blob URL | `403 Forbidden` / `404 Not Found` | Storage container blocks anonymous read access; no candidate data leaked | Critical | Automated (Azure Storage Mock) |
+| **TC-SEC-002** | `GET /api/draft` / Content Page | Preview cookie automatic expiration | Security / Session | Request content page with `__prerender_bypass` cookie aged 61 minutes | Renders Published Content | Cookie treated as expired; draft changes not displayed to unauthorized user | High | Automated (Supertest) |
+| **TC-PERF-001** | `POST /api/revalidate` | Cache revalidation execution latency | Performance SLA | Valid revalidation request purging 5 tags | `200 OK` | Execution time < 1,500ms; response contains `{ revalidated: true }` | High | Automated (Supertest benchmark) |
+| **TC-PERF-002** | `GET /services/sap-modernization` | Cached marketing page edge delivery latency | Performance SLA | HTTP GET request to cached Next.js page via edge CDN | `200 OK` | Edge TTFB < 500ms; `X-Cache: HIT` header present | High | Automated (k6 benchmark) |
+| **TC-RES-001** | Outbox Worker (`lead_outbox`)| Outbox retry backoff & permanent failure alert | Resilience SLA | CRM returns 503 for 5 consecutive retry attempts | Worker stops retries | Lead status set to `FAILED_DISPATCH`; Application Insights Sev-2 alert logged | Critical | Automated (Integration Worker Test) |
+| **TC-CMS-001** | `POST /api/upload` (Strapi) | Malicious SVG upload containing embedded script | Security / Content | SVG file containing `<script>alert(1)</script>` | `400 Bad Request` | Upload rejected or SVG sanitized via DOMPurify before storage commit | Critical | Automated (Supertest) |
+| **TC-RED-001** | `GET /old-service-url` | Vanity redirect execution latency & query preservation | SEO / Middleware | Incoming request `?utm_source=google` to configured redirect rule | `301 Moved Permanently` | Redirect latency < 10ms; target URL preserves incoming query string | High | Automated (Supertest) |
+| **TC-GDPR-001** | Data Purge Cron (`careers_db`) | 180-day candidate retention automated purge | GDPR Compliance | Requisition closed 181 days ago with submitted applications | DB records deleted | Candidate rows removed from DB; blob keys deleted from storage container | High | Automated (Cron Unit Test) |
 
 ---
 
@@ -85,3 +95,12 @@ This test matrix defines the comprehensive validation suite for all public Route
 |    - 500 virtual users testing rate limits and cache hits   |
 +-------------------------------------------------------------+
 ```
+
+---
+
+## 4. Change Log & Revision History
+
+| Version | Date | Author | Description of Changes |
+| :--- | :--- | :--- | :--- |
+| **v1.0** | 2026-09-23 | QA Automation Lead | Initial Test Matrix drafting with 37 QA test cases. |
+| **v1.1** | 2026-09-23 | Principal API Architect | **Contract Consistency Review & Reconciliation:**<br>1. Updated document status to `Draft for Backend, Frontend, Integration, Security, and QA Review`.<br>2. Added 8 missing acceptance criteria test cases from Main SRS: `TC-SEC-001` (private blob 403), `TC-SEC-002` (preview cookie 60m expiry), `TC-PERF-001` (revalidation < 1,500ms), `TC-PERF-002` (edge TTFB < 500ms), `TC-RES-001` (outbox 5-retry limit & alert), `TC-CMS-001` (SVG script sanitization), `TC-RED-001` (vanity redirect < 10ms), `TC-GDPR-001` (180-day retention purge).<br>3. Total test coverage expanded from 37 to 45 test scenarios.<br>4. Reclassified target test contracts to `[PROPOSED]`. |

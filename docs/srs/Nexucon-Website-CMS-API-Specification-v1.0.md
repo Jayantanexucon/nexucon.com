@@ -3,10 +3,11 @@
 **Document Reference:** NEX-API-SPEC-v1.0  
 **Project:** Nexucon Corporate Website, Careers Engine & Headless Marketing CMS Platform  
 **Target Release:** Production Launch (Releases 1, 2, 3)  
+**Status:** Draft for Backend, Frontend, Integration, Security, and QA Review  
 **Standard Response Contract:** Enforced  
 **Classification System:**  
 - `[VERIFIED-AS-IS]`: Inspected directly from source code (`nexucon.com` and `Nexucon-Main-Page`).  
-- `[APPROVED-TARGET]`: Formally agreed target architecture contract.  
+- `[APPROVED-TARGET]`: Formally agreed target architecture contract (0 items approved to date).  
 - `[PROPOSED]`: Recommended best-practice architectural pattern pending stakeholder sign-off.  
 - `[EXAMPLE-ONLY]`: Illustrative placeholder structure.  
 - `[TBD WITH OWNER]`: Unresolved external contract requiring third-party owner confirmation.  
@@ -16,9 +17,9 @@
 ## Table of Contents
 1. [Executive Summary & Architecture Context](#1-executive-summary--architecture-context)
 2. [Governance, Standards & Conventions](#2-governance-standards--conventions)
-3. [Security & Compliance Architecture](#3-security--compliance-architecture)
+3. [Security, Compliance & RBAC Role Architecture](#3-security-compliance--rbac-role-architecture)
 4. [Data Dictionary & Global Schemas](#4-data-dictionary--global-schemas)
-5. [As-Is Legacy Route Analysis & Gap Assessment](#5-as-is-legacy-route-analysis--gap-assessment)
+5. [As-Is Legacy Route Analysis & Decommissioning Cards](#5-as-is-legacy-route-analysis--decommissioning-cards)
 6. [Public Web & Lead Ingestion APIs](#6-public-web--lead-ingestion-apis)
 7. [Cache Invalidation & CMS Integration APIs](#7-cache-invalidation--cms-integration-apis)
 8. [Careers & Recruitment APIs (Public)](#8-careers--recruitment-apis-public)
@@ -127,13 +128,28 @@ All custom Route Handlers (`app/api/*`) MUST return one of two standard JSON env
 
 ---
 
-## 3. Security & Compliance Architecture
+## 3. Security, Compliance & RBAC Role Architecture
 
-1. **Bot & Spam Mitigation:** Cloudflare Turnstile integration enforced on `/api/leads` and `/api/careers/apply`. Verified sitekey: `0x4AAAAAAEzj0TBy47cuNvYY` `[VERIFIED-AS-IS]`. Secret validated server-side against `https://challenges.cloudflare.com/turnstile/v0/siteverify`.
-2. **Administrative Identity & RBAC:** Microsoft Entra ID (Azure AD SSO) for all internal recruiters and administrators. Custom prototype authentication (`/api/auth/login`) permanently decommissioned.
-3. **Integration Webhook Security:** ATS webhooks require HMAC-SHA256 signature verification passed in `X-Nexucon-ATS-Signature` header, evaluated against request body and timestamp (300-second tolerance).
-4. **Data Isolation & GDPR Compliance:** Candidate resumes stored in private Azure Blob container (`resumes-private`). Resumes accessible exclusively via 15-minute User Delegation SAS URLs.
-5. **PII Masking in Logs:** Server telemetry strictly masks candidate and lead contact details in Azure Application Insights (`j***e@domain.com`, `+44 *** *** 0958`).
+### 3.1 Bot & Spam Mitigation
+Cloudflare Turnstile integration is enforced on `/api/leads` and `/api/careers/apply`. Verified sitekey: `0x4AAAAAAEzj0TBy47cuNvYY` `[VERIFIED-AS-IS]`. Secret validated server-side against `https://challenges.cloudflare.com/turnstile/v0/siteverify` `[PROPOSED]`.
+
+### 3.2 Administrative Identity & Centralized RBAC Role Registry
+Microsoft Entra ID (Azure AD SSO) governs access for internal staff. The authoritative RBAC roles are:
+- **`Nexucon.Recruiter`:** Authorized to query candidate applications and generate temporary 15-minute SAS resume download URLs.
+- **`Nexucon.RecruitmentAdmin`:** Full administrative rights over careers pipelines, recruiter allocations, and GDPR data retention deletion tasks.
+- **`Nexucon.MarketingEditor`:** Authorized to create, edit, and preview draft content in Strapi 5 CMS.
+- **`Nexucon.MarketingAdmin`:** Authorized to publish/unpublish marketing content, configure site settings, and manage vanity 301 redirects.
+- **`Nexucon.TechnicalAdmin`:** Cloud infrastructure, Key Vault secret management, and CI/CD operations.
+
+### 3.3 Candidate Data Boundary & Anti-Pattern Prohibition
+> [!CAUTION]
+> **Strict Segregation Mandate:** Under no circumstances shall candidate application submissions, candidate names, contact details, or resumes be saved into Strapi collections or Strapi media libraries. Careers data is strictly segregated into a dedicated PostgreSQL schema (`careers_applications`) and private Azure Blob Storage (`resumes-private`).
+
+### 3.4 Integration Webhook Security
+ATS webhooks require HMAC-SHA256 signature verification passed in `X-Nexucon-ATS-Signature` header, evaluated against request body and timestamp (300-second tolerance).
+
+### 3.5 Data Isolation & GDPR Compliance
+Candidate resumes stored in private Azure Blob container (`resumes-private`). Resumes accessible exclusively via 15-minute User Delegation SAS URLs. Retained for 180 days post-requisition closure.
 
 ---
 
@@ -150,19 +166,19 @@ All custom Route Handlers (`app/api/*`) MUST return one of two standard JSON env
 
 ---
 
-## 5. As-Is Legacy Route Analysis & Gap Assessment
+## 5. As-Is Legacy Route Analysis & Decommissioning Cards
 
-The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/*`:
+The existing repository contains 9 prototype routes in `app/api/*` and `app/admin/*`. All are scheduled for decommissioning in accordance with `NEX-API-RET-v1.0`:
 
 1. **`POST /api/auth/login` (`app/api/auth/login/route.ts`):** Custom bcrypt + `jose` JWT cookie. Lacks rate limiting, MFA, and revocation. **Disposition: Decommission (Return 410 Gone).**
 2. **`POST /api/auth/logout` (`app/api/auth/logout/route.ts`):** Clears cookie only. **Disposition: Decommission (Return 410 Gone).**
-3. **`GET /api/content` (`app/api/content/route.ts`):** MongoDB slug lookup. Lacks caching and pagination. **Disposition: Replace with Strapi 5 REST API.**
-4. **`POST /api/content` (`app/api/content/route.ts`):** Unversioned page mutation. Any user can overwrite all pages. **Disposition: Replace with Strapi Content Manager.**
-5. **`POST /api/enquiries` (`app/api/enquiries/route.ts`):** Unprotected form submission. No bot defense, no CRM sync. **Disposition: Redirect (308) to `/api/leads`.**
-6. **`POST /api/upload` (`app/api/upload/route.ts`):** Writes files to ephemeral local disk `public/uploads/`. **Disposition: Replace with Strapi Azure Blob Provider.**
-7. **`POST /api/analytics` (`app/api/analytics/route.ts`):** Heavy DB write beacon. **Disposition: Deprecate in favor of GA4/GTM.**
-8. **`POST /admin/create-user` (`app/admin/create-user/route.ts`):** Local user creation. **Disposition: Decommission (Return 410 Gone).**
-9. **`POST /admin/save-settings` (`app/admin/save-settings/route.ts`):** Stores legacy PHP snippets (`<!-- header.php -->`). **Disposition: Replace with Strapi Global Settings.**
+3. **`GET /api/content` (`app/api/content/route.ts`):** MongoDB slug lookup. Lacks caching and pagination. **Disposition: Replace with Strapi 5 REST API (Return 410 Gone).**
+4. **`POST /api/content` (`app/api/content/route.ts`):** Unversioned page mutation. Any user can overwrite all pages. **Disposition: Replace with Strapi Content Manager (Return 410 Gone).**
+5. **`POST /api/enquiries` (`app/api/enquiries/route.ts`):** Unprotected form submission. No bot defense, no CRM sync. **Disposition: Redirect (HTTP 308 Permanent Redirect) to `/api/leads`.**
+6. **`POST /api/upload` (`app/api/upload/route.ts`):** Writes files to ephemeral local disk `public/uploads/`. **Disposition: Replace with Strapi Azure Blob Provider (Return 410 Gone).**
+7. **`POST /api/analytics` (`app/api/analytics/route.ts`):** Heavy DB write beacon. **Disposition: Deprecate in favor of GA4/GTM (Return 410 Gone).**
+8. **`POST /admin/create-user` (`app/admin/create-user/route.ts`):** Local user creation without complexity checks or role authorization. **Disposition: Decommission in favor of Entra ID (Return 410 Gone).**
+9. **`POST /admin/save-settings` (`app/admin/save-settings/route.ts`):** Stores legacy PHP snippets (`<!-- header.php -->`). **Disposition: Replace with Strapi Global Settings Single Type (Return 410 Gone).**
 
 ---
 
@@ -171,7 +187,7 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-WEB-01: Inbound Lead & Contact Submission
 
 - **A. Identifier:** API-WEB-01
-- **B. Classification:** `[APPROVED-TARGET]`
+- **B. Classification:** `[PROPOSED]`
 - **C. Method & Route:** `POST /api/leads`
 - **D. Summary & Business Context:** Ingests contact enquiries, SAP consultation requests, and campaign landing page submissions. Enforces Turnstile bot validation, normalizes E.164 phone formats, captures UTM attribution, persists to PostgreSQL transactional outbox, and queues CRM synchronization.
 - **E. Target Consumers:** Public Website visitors on `/contact`, `/sap-business-one`, and marketing campaign landing pages.
@@ -236,7 +252,7 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-WEB-02: On-Demand Cache Revalidation Webhook
 
 - **A. Identifier:** API-WEB-02
-- **B. Classification:** `[APPROVED-TARGET]`
+- **B. Classification:** `[PROPOSED]`
 - **C. Method & Route:** `POST /api/revalidate`
 - **D. Summary & Business Context:** Webhook endpoint invoked by Strapi 5 upon content publishing, editing, or unpublishing. Immediately purges Next.js ISR tag caches via `revalidateTag()`.
 - **E. Target Consumers:** Strapi 5 Webhook Engine running on Azure App Service.
@@ -258,7 +274,7 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
   }
   ```
 - **J. Response Status Codes & Envelopes:**
-  - `200 OK`: Cache purged successfully.
+  - `200 OK`: Cache purged successfully. Execution SLA < 1,500ms.
     ```json
     {
       "success": true,
@@ -280,9 +296,9 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-WEB-03: Next.js Draft Mode Preview Toggle
 
 - **A. Identifier:** API-WEB-03
-- **B. Classification:** `[APPROVED-TARGET]`
+- **B. Classification:** `[PROPOSED]`
 - **C. Method & Route:** `GET /api/draft`
-- **D. Summary & Business Context:** Enables Next.js Draft Mode (`draftMode().enable()`) and sets secure preview cookie `__prerender_bypass`, allowing editors to preview unpublished Strapi drafts on live site layouts.
+- **D. Summary & Business Context:** Enables Next.js Draft Mode (`draftMode().enable()`) and sets secure preview cookie `__prerender_bypass` (with 60-minute auto-expiry), allowing editors to preview unpublished Strapi drafts on live site layouts.
 - **E. Target Consumers:** Strapi 5 Content Manager preview button.
 - **F. Authentication & Authorization:** Query parameter secret token validated against Key Vault secret `NEXT_PREVIEW_SECRET`.
 - **G. Request Query Parameters:**
@@ -302,7 +318,7 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-CAR-01: Public Job Requisition Feed
 
 - **A. Identifier:** API-CAR-01
-- **B. Classification:** `[APPROVED-TARGET]`
+- **B. Classification:** `[PROPOSED]`
 - **C. Method & Route:** `GET /api/careers/jobs`
 - **D. Summary & Business Context:** Retrieves active, published job openings with filtering (practice area, location, employment type) and pagination.
 - **E. Target Consumers:** Public Careers Portal (`/careers`).
@@ -351,7 +367,7 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-CAR-02: Public Job Requisition Detail
 
 - **A. Identifier:** API-CAR-02
-- **B. Classification:** `[APPROVED-TARGET]`
+- **B. Classification:** `[PROPOSED]`
 - **C. Method & Route:** `GET /api/careers/jobs/[slug]`
 - **D. Summary & Business Context:** Returns comprehensive job description, responsibilities, requirements, and embedded Schema.org `JobPosting` JSON-LD for search engine indexing.
 - **E. Target Consumers:** Public Job Detail Page (`/careers/[slug]`).
@@ -366,7 +382,7 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-CAR-03: Candidate Application & Resume Submission
 
 - **A. Identifier:** API-CAR-03
-- **B. Classification:** `[APPROVED-TARGET]`
+- **B. Classification:** `[PROPOSED]`
 - **C. Method & Route:** `POST /api/careers/apply`
 - **D. Summary & Business Context:** Ingests candidate applications and resume files. Verifies Turnstile anti-bot token, checks file magic bytes in memory, persists resume to private Azure Blob Storage (`resumes-private`), records application in PostgreSQL, and queues ATS candidate sync.
 - **E. Target Consumers:** Candidate Application Modal/Form on Job Detail Page.
@@ -388,7 +404,7 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
   - `linkedinUrl` (string, optional).
   - `consentDataProcessing` (boolean, required: `true`).
   - `turnstileToken` (string, required).
-  - `resume` (Binary File, required): PDF or DOCX file, max 5,242,880 bytes.
+  - `resume` (Binary File, required): PDF or DOCX file, max 5,242,880 bytes (5 MB). Baseline legacy limit was 4 MB PDF `[VERIFIED-AS-IS]`.
 - **I. Response Status Codes & Envelopes:**
   - `201 Created`:
     ```json
@@ -420,11 +436,11 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-CAR-04: Authorized Resume Download SAS Generator
 
 - **A. Identifier:** API-CAR-04
-- **B. Classification:** `[APPROVED-TARGET]`
+- **B. Classification:** `[PROPOSED]`
 - **C. Method & Route:** `GET /api/careers/admin/applications/[id]/resume-url`
 - **D. Summary & Business Context:** Generates a temporary, 15-minute Azure Shared Access Signature (SAS) download URL for authorized recruitment personnel.
 - **E. Target Consumers:** Internal Careers Administration Portal.
-- **F. Authentication & Authorization:** Microsoft Entra ID Bearer Token or authenticated session cookie. Required Role: `Recruiter` or `Recruitment_Admin`.
+- **F. Authentication & Authorization:** Microsoft Entra ID Bearer Token or authenticated session cookie. Required Role: `Nexucon.Recruiter` or `Nexucon.RecruitmentAdmin`.
 - **G. Response Status Codes & Envelopes:**
   - `200 OK`:
     ```json
@@ -433,7 +449,7 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
       "correlationId": "sas_0912BC",
       "message": "Temporary resume download URL generated.",
       "data": {
-        "downloadUrl": "https://stnexuconresumes.blob.core.windows.net/resumes-private/2026/09/uuid.pdf?sp=r&st=2026-09-23T20%3A30%3A00Z&se=2026-09-23T20%3A45%3A00Z&spr=https&sig=...",
+        "downloadUrl": "https://<storage-account>.blob.core.windows.net/resumes-private/2026/09/uuid.pdf?sp=r&st=2026-09-23T20%3A30%3A00Z&se=2026-09-23T20%3A45%3A00Z&spr=https&sig=...",
         "expiresAt": "2026-09-23T20:45:00Z"
       },
       "errors": []
@@ -451,16 +467,16 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-INT-01: ATS Inbound Job Requisition Webhook
 
 - **A. Identifier:** API-INT-01
-- **B. Classification:** `[APPROVED-TARGET]`
+- **B. Classification:** `[PROPOSED CONTRACT - PENDING ATS OWNER SIGN-OFF]`
 - **C. Method & Route:** `POST /api/integrations/ats/jobs`
-- **D. Summary & Business Context:** Ingests job requisition lifecycle events (`CREATED`, `UPDATED`, `CLOSED`) dispatched by Nexucon's corporate ATS.
+- **D. Summary & Business Context:** Ingests job requisition lifecycle events (`CREATED`, `UPDATED`, `CLOSED`) dispatched by Nexucon's corporate ATS. Note: Exact schema is pending delivery from Corporate ATS Engineering Team (RAID R-02, D-01).
 - **E. Target Consumers:** Corporate ATS Webhook Dispatcher.
 - **F. Authentication & Authorization:** HMAC-SHA256 Signature passed in `X-Nexucon-ATS-Signature` header. Timestamp skew validation in `X-Nexucon-ATS-Timestamp`.
 - **G. Request Headers:**
   - `X-Nexucon-ATS-Signature: <hex-encoded-hmac>`
   - `X-Nexucon-ATS-Timestamp: <unix-timestamp>`
   - `Content-Type: application/json`
-- **H. Request Body Schema (`application/json`):**
+- **H. Request Body Schema (`application/json`) [EXAMPLE-ONLY]:**
   ```json
   {
     "event": "JOB_REQUISITION_UPDATED",
@@ -490,11 +506,11 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 ### API-INT-02: Outbound CRM Dispatch Adapter
 
 - **A. Identifier:** API-INT-02
-- **B. Classification:** `[APPROVED-TARGET]`
-- **C. Target System:** Corporate Lead Management Portal (`https://<configured-crm-host>/v1/leads`) `[TBD WITH CRM OWNER]`.
+- **B. Classification:** `[PROPOSED CONTRACT - PENDING CRM OWNER SIGN-OFF]`
+- **C. Target System:** Corporate Lead Management Portal (`https://<configured-crm-host>/api/v1/leads`) `[TBD WITH CRM OWNER]`.
 - **D. Direction:** Outbound server-side HTTPS call dispatched by background worker.
 - **E. Authentication:** Azure Key Vault managed API Key passed in `X-Nexucon-CRM-Key`.
-- **F. Outbound Payload Contract:**
+- **F. Outbound Payload Contract [EXAMPLE-ONLY]:**
   ```json
   {
     "sourceSystem": "nexucon-public-website",
@@ -512,13 +528,14 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
     },
     "telemetry": {
       "utmSource": "linkedin",
+      "utmMedium": "paid-social",
       "utmCampaign": "sap-q4-accelerator",
       "landingPage": "https://nexucon.com/services/sap",
       "submittedAt": "2026-09-23T20:30:00Z"
     }
   }
   ```
-- **G. Retry Policy:** Exponential backoff (1s, 5s, 30s, 5m, 30m). Failed dispatches remain in outbox table with status `FAILED_DISPATCH`, triggering Application Insights Sev-2 warning alerts.
+- **G. Retry Policy:** Exponential backoff (1s, 5s, 30s, 5m, 30m). Up to 5 retries. Failed dispatches remain in outbox table with status `FAILED_DISPATCH`, triggering Application Insights Sev-2 warning alerts.
 
 ---
 
@@ -526,15 +543,15 @@ The existing codebase contains 9 prototype routes in `app/api/*` and `app/admin/
 
 All content APIs are provided directly by Strapi 5 running on Azure App Service and consumed server-side by Next.js React Server Components.
 
-| Endpoint & Method | Purpose | Consumer | Auth & Headers | Caching in Next.js |
-| :--- | :--- | :--- | :--- | :--- |
-| **`GET /api/global-setting`** | Fetches site title, navigation menus, social links, footer data, and default SEO schemas. | Next.js Root Layout (`layout.tsx`) | Strapi API Read Token (`Authorization: Bearer <STRAPI_READ_TOKEN>`) | ISR: Tag `global-settings` (Revalidated on demand via webhook). |
-| **`GET /api/pages`** | Fetches marketing landing pages by slug with populated dynamic sections. | Next.js Page Router (`app/[...slug]/page.tsx`) | Strapi API Read Token | ISR: Tag `page-[slug]` (Revalidated on demand via webhook). |
-| **`GET /api/services`** | Fetches practice area services (SAP, AI, Cloud, Enterprise Modernization, Staff Augmentation). | Next.js Service Templates (`app/services/*`) | Strapi API Read Token | ISR: Tag `services`, `service-[slug]`. |
-| **`GET /api/blogs`** | Fetches published thought leadership articles with author relations and tags. | Next.js Blog Templates (`app/insights/*`) | Strapi API Read Token | ISR: Tag `blogs`, `blog-[slug]`. |
-| **`GET /api/case-studies`** | Fetches enterprise transformation case studies with client impact metrics. | Next.js Case Study Templates (`app/work/*`) | Strapi API Read Token | ISR: Tag `case-studies`. |
-| **`GET /api/redirects`** | Fetches vanity redirect rules configured by digital marketing. | Next.js Middleware / Route cache | Strapi API Read Token | In-memory edge cache with 1-hour fallback. |
-| **`POST /api/upload`** | Uploads public marketing media assets to Azure Blob Storage container (`media-public`). | Strapi Admin Content Editors | Strapi Session / Admin JWT | Direct Azure Blob Storage commit via `@strapi/provider-upload-azure-storage`. |
+| Endpoint & Method | Strapi Content Type UID | Purpose | Consumer | Auth & Headers | Caching in Next.js |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`GET /api/global-setting`** | `api::global-setting.global-setting` | Fetches site title, navigation menus, social links, footer data, and default SEO schemas. | Next.js Root Layout (`layout.tsx`) | Strapi API Read Token (`Authorization: Bearer <STRAPI_READ_TOKEN>`) | ISR: Tag `global-settings` (Revalidated on demand via webhook). |
+| **`GET /api/pages`** | `api::page.page` | Fetches marketing landing pages by slug with populated dynamic sections. | Next.js Page Router (`app/[...slug]/page.tsx`) | Strapi API Read Token | ISR: Tag `page-[slug]` (Revalidated on demand via webhook). |
+| **`GET /api/services`** | `api::service.service` | Fetches practice area services (SAP, AI, Cloud, Enterprise Modernization, Staff Augmentation). | Next.js Service Templates (`app/services/*`) | Strapi API Read Token | ISR: Tag `services`, `service-[slug]`. |
+| **`GET /api/blogs`** | `api::blog.blog` | Fetches published thought leadership articles with author relations and tags. | Next.js Blog Templates (`app/insights/*`) | Strapi API Read Token | ISR: Tag `blogs`, `blog-[slug]`. |
+| **`GET /api/case-studies`** | `api::case-study.case-study` | Fetches enterprise transformation case studies with client impact metrics. | Next.js Case Study Templates (`app/work/*`) | Strapi API Read Token | ISR: Tag `case-studies`. |
+| **`GET /api/redirects`** | `api::redirect.redirect` | Fetches vanity redirect rules configured by digital marketing. | Next.js Middleware / Route cache | Strapi API Read Token | In-memory edge cache with 1-hour fallback. |
+| **`POST /api/upload`** | Core Upload Plugin | Uploads public marketing media assets to Azure Blob Storage container (`media-public`). | Strapi Admin Content Editors | Strapi Session / Admin JWT | Direct Azure Blob Storage commit via `@strapi/provider-upload-azure-storage`. |
 
 ---
 
@@ -567,7 +584,8 @@ To guarantee zero lead loss during CRM network partitions, inbound leads are man
                   |-- Reads 'PENDING' records from 'lead_outbox'
                   |-- Dispatches POST to Corporate CRM Gateway
                   |-- On Success: Updates outbox status to 'DISPATCHED'
-                  |-- On Failure: Increments retry_count, schedules exponential backoff
+                  |-- On Failure: Increments retry_count, schedules exponential backoff (up to 5 attempts)
+                  |-- On 5th Failure: Updates status to 'FAILED_DISPATCH', raises Sev-2 Alert
 ```
 
 ---
@@ -594,7 +612,7 @@ A two-tier rate-limiting strategy safeguards public endpoints:
 ## 17. File Upload & Binary Asset Security Architecture
 
 All candidate resume uploads (`POST /api/careers/apply`) undergo strict defensive filtering:
-1. **Size Boundary:** Maximum 5,242,880 bytes (5 MB). Files exceeding this limit are rejected with HTTP 413.
+1. **Size Boundary:** Maximum 5,242,880 bytes (5 MB). Files exceeding this limit are rejected with HTTP 413. Baseline legacy was 4 MB `[VERIFIED-AS-IS]`.
 2. **Extension Allowlist:** Only `.pdf` and `.docx` extensions allowed.
 3. **Binary Magic-Byte Inspection:** Node.js streams inspect initial chunk bytes in memory before committing to disk:
    - PDF magic bytes: `%PDF-` (`0x25 0x50 0x44 0x46`).
@@ -731,7 +749,7 @@ For the exhaustive inventory of all 42 error codes, internal log formats, retrya
 
 ## 21. Test Matrix Reference & QA Verification Strategy
 
-For the complete 37-case QA automation matrix covering functional, boundary, negative, security, idempotency, rate limiting, and failure resilience test suites, refer to:  
+For the complete 45-case QA automation matrix covering functional, boundary, negative, security, idempotency, rate limiting, and failure resilience test suites, refer to:  
 **[`Nexucon-Website-CMS-API-Test-Matrix.md`](file:///Users/avishekchakraborty/dev/Website_projs_B1/next_nexucon_website/nexucon.com/docs/srs/Nexucon-Website-CMS-API-Test-Matrix.md)**.
 
 ---
@@ -745,7 +763,7 @@ For the full evaluation of alternatives, trade-offs, and governance rationale ac
 
 ## 23. Legacy API Retirement Schedule
 
-For the comprehensive phased retirement timeline, data migration scripts, security rollback procedures, and cutover sign-off criteria, refer to:  
+For the comprehensive phased retirement timeline, data migration scripts, security rollback procedures, cutover sign-off criteria, and consumer cutover playbooks, refer to:  
 **[`Nexucon-Website-CMS-API-Retirement-Plan.md`](file:///Users/avishekchakraborty/dev/Website_projs_B1/next_nexucon_website/nexucon.com/docs/srs/Nexucon-Website-CMS-API-Retirement-Plan.md)**.
 
 ---
@@ -794,11 +812,11 @@ Release 3: Production Cutover (Sprint 7 - 8)
 
 | Role / Stakeholder | Name / Title | Responsibility | Sign-Off Date |
 | :--- | :--- | :--- | :--- |
-| **Principal Solution Architect** | Senior Architect, Cloud & Web | Accountable (A) | Approved (2026-09-23) |
-| **Lead Backend Engineer** | Senior Backend Engineer | Responsible (R) | Approved (2026-09-23) |
-| **Senior Frontend Engineer** | Next.js Specialist Lead | Responsible (R) | Approved (2026-09-23) |
-| **Cloud Security Architect** | Enterprise Security Lead | Consulted (C) | Approved (2026-09-23) |
-| **QA Automation Lead** | Quality Assurance Lead | Responsible (R) | Approved (2026-09-23) |
+| **Principal Solution Architect** | Senior Architect, Cloud & Web | Accountable (A) | In Review |
+| **Lead Backend Engineer** | Senior Backend Engineer | Responsible (R) | In Review |
+| **Senior Frontend Engineer** | Next.js Specialist Lead | Responsible (R) | In Review |
+| **Cloud Security Architect** | Enterprise Security Lead | Consulted (C) | In Review |
+| **QA Automation Lead** | Quality Assurance Lead | Responsible (R) | In Review |
 | **ATS / CRM Product Owners** | Corporate Integration Owners | Informed (I) | In Review |
 
 ### Revision History
@@ -806,4 +824,5 @@ Release 3: Production Cutover (Sprint 7 - 8)
 | Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
 | **v0.1** | 2026-09-22 | Solution Architecture Team | Initial As-Is API inventory and high-level catalogue draft. |
-| **v1.0** | 2026-09-23 | Principal API Architect & Engineering Team | Complete, implementation-ready API specification covering all 27 sections, unified response contracts, Zod schemas, PostgreSQL DDL, error catalogues, test matrices, and retirement plans. |
+| **v1.0** | 2026-09-23 | Principal API Architect & Engineering Team | Complete API specification covering 27 sections. |
+| **v1.1** | 2026-09-23 | Principal API Architect & Engineering Team | **Contract Consistency Review & Reconciliation:**<br>1. Updated document status to `Draft for Backend, Frontend, Integration, Security, and QA Review`.<br>2. Reclassified all target contracts from `[APPROVED-TARGET]` to `[PROPOSED]` to enforce project governance.<br>3. Defined explicit RBAC Role Definitions (`Nexucon.Recruiter`, `Nexucon.MarketingEditor`, etc.) in Section 3.<br>4. Added Candidate Data Boundary & Anti-Pattern Prohibition statement.<br>5. Harmonized field names across schemas and mappings (`email`, `phone`, `company`, `message`).<br>6. Added decommissioning endpoint cards for `POST /admin/create-user` and `POST /admin/save-settings`.<br>7. Updated Test Matrix cross-reference to 45 test scenarios.<br>8. Masked all private endpoints as `https://<configured-crm-host>/...`. |

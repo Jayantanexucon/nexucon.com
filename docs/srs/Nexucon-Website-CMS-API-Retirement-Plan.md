@@ -3,6 +3,7 @@
 **Document Reference:** NEX-API-RET-v1.0  
 **Project:** Nexucon Company Website, Careers Engine & Marketing CMS Platform  
 **Target Release:** Full Decommissioning by Release 3 Production Cutover  
+**Status:** Draft for Backend, Frontend, Integration, Security, and QA Review  
 **Classification:** Engineering Migration & Governance Plan  
 
 ---
@@ -17,18 +18,18 @@ This retirement plan establishes the formal strategy to decommission these proto
 
 ## 2. Inventory of Endpoints Scheduled for Retirement
 
-| Legacy Endpoint / Action | Verified File Path | Replacement Architecture | Phased Cutover | HTTP Decommissioning Behavior |
-| :--- | :--- | :--- | :--- | :--- |
-| **`POST /api/auth/login`** | `app/api/auth/login/route.ts` | Strapi Admin Native Auth + Microsoft Entra ID (SSO) | Release 1 | Return `410 Gone` with migration notice JSON |
-| **`POST /api/auth/logout`** | `app/api/auth/logout/route.ts` | Entra ID Single Sign-Out / Strapi Session Purge | Release 1 | Return `410 Gone` |
-| **`GET /api/content`** | `app/api/content/route.ts` | Strapi 5 REST API (`GET /api/pages`) + Next.js ISR | Release 1 | Return `410 Gone` |
-| **`POST /api/content`** | `app/api/content/route.ts` | Strapi 5 Content Manager (Draft & Publish) | Release 1 | Return `410 Gone` |
-| **`POST /api/enquiries`** | `app/api/enquiries/route.ts` | Target `POST /api/leads` + CRM Outbox Adapter | Release 2 | HTTP `308 Permanent Redirect` to `/api/leads` |
-| **`POST /api/upload`** | `app/api/upload/route.ts` | Strapi Azure Blob Storage Provider + `/api/careers/apply` | Release 1 | Return `410 Gone` |
-| **`POST /api/analytics`** | `app/api/analytics/route.ts` | Google Analytics 4 (via GTM) + Azure App Insights | Release 2 | Return `204 No Content` -> `410 Gone` |
-| **`POST /admin/create-user`** | `app/admin/create-user/route.ts` | Microsoft Entra ID User Provisioning & Strapi RBAC | Release 1 | Return `410 Gone` |
-| **`POST /admin/save-settings`** | `app/admin/save-settings/route.ts` | Strapi 5 Single Type: `GlobalSiteSettings` | Release 1 | Return `410 Gone` |
-| **Server Actions (`actions.ts`)**| `app/admin/actions.ts` | Direct Strapi CMS editing & React Server Components | Release 1 | Code removal from repository |
+| Legacy Endpoint / Action | Verified File Path | Replacement Architecture | Phased Cutover | HTTP Decommissioning Behavior | Classification |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`POST /api/auth/login`** | `app/api/auth/login/route.ts` | Strapi Admin Native Auth + Microsoft Entra ID (SSO) | Release 1 | Return `410 Gone` with migration notice JSON | `[VERIFIED-AS-IS / PROPOSED]` |
+| **`POST /api/auth/logout`** | `app/api/auth/logout/route.ts` | Entra ID Single Sign-Out / Strapi Session Purge | Release 1 | Return `410 Gone` | `[VERIFIED-AS-IS / PROPOSED]` |
+| **`GET /api/content`** | `app/api/content/route.ts` | Strapi 5 REST API (`GET /api/pages`) + Next.js ISR | Release 1 | Return `410 Gone` | `[VERIFIED-AS-IS / PROPOSED]` |
+| **`POST /api/content`** | `app/api/content/route.ts` | Strapi 5 Content Manager (Draft & Publish) | Release 1 | Return `410 Gone` | `[VERIFIED-AS-IS / PROPOSED]` |
+| **`POST /api/enquiries`** | `app/api/enquiries/route.ts` | Target `POST /api/leads` + CRM Outbox Adapter | Release 2 | HTTP `308 Permanent Redirect` to `/api/leads` | `[VERIFIED-AS-IS / PROPOSED]` |
+| **`POST /api/upload`** | `app/api/upload/route.ts` | Strapi Azure Blob Storage Provider + `/api/careers/apply` | Release 1 | Return `410 Gone` | `[VERIFIED-AS-IS / PROPOSED]` |
+| **`POST /api/analytics`** | `app/api/analytics/route.ts` | Google Analytics 4 (via GTM) + Azure App Insights | Release 2 | Return `410 Gone` | `[VERIFIED-AS-IS / PROPOSED]` |
+| **`POST /admin/create-user`** | `app/admin/create-user/route.ts` | Microsoft Entra ID User Provisioning & Strapi RBAC | Release 1 | Return `410 Gone` | `[VERIFIED-AS-IS / PROPOSED]` |
+| **`POST /admin/save-settings`** | `app/admin/save-settings/route.ts` | Strapi 5 Single Type: `GlobalSiteSettings` | Release 1 | Return `410 Gone` | `[VERIFIED-AS-IS / PROPOSED]` |
+| **Server Actions (`actions.ts`)**| `app/admin/actions.ts` | Direct Strapi CMS editing & React Server Components | Release 1 | Code removal from repository | `[VERIFIED-AS-IS / PROPOSED]` |
 
 ---
 
@@ -84,7 +85,7 @@ This retirement plan establishes the formal strategy to decommission these proto
      - Transform markdown and block structures into Strapi 5 Dynamic Zone components.
      - Extract navigation, footer, and branding fields from `SiteSettingsModel` into Strapi Single Type `GlobalSiteSettings`.
   2. Verify all slugs render with 100% fidelity via Next.js React Server Components.
-  3. Replace route handlers with HTTP `410 Gone` returning `LEGACY-CONTENT-RETIRED-002`.
+  3. Replace route handlers with HTTP `410 Gone` returning `LEGACY-CONTENT-RETIRED-002` and `LEGACY-ADMIN-ROUTE-LOCKED-006`.
 
 ### 4.3 Inbound Enquiry & Lead Routes
 * **Endpoint:** `POST /api/enquiries`
@@ -113,7 +114,7 @@ This retirement plan establishes the formal strategy to decommission these proto
   1. Integrate Google Tag Manager (GTM) container script in Next.js Root Layout (`app/layout.tsx`).
   2. Configure GA4 tags for pageviews, button clicks, and form submissions.
   3. Configure Azure Application Insights SDK for server-side route telemetry and error tracking.
-  4. Temporarily return HTTP `204 No Content` for 14 days to absorb client caching lag, then replace with HTTP `410 Gone`.
+  4. Replace `POST /api/analytics` with HTTP `410 Gone` returning `LEGACY-ANALYTICS-RETIRED-005`.
 
 ---
 
@@ -134,3 +135,51 @@ This retirement plan establishes the formal strategy to decommission these proto
 - [ ] Outbound CRM outbox worker verified processing test leads to corporate CRM gateway.
 - [ ] All 9 legacy routes return expected HTTP 410 / 308 status codes.
 - [ ] Zero unhandled 500 exceptions reported in Azure Application Insights over 72 continuous hours.
+
+---
+
+## 7. Consumer Migration & Cutover Playbook
+
+This playbook establishes explicit cutover procedures for all three active consumer groups interacting with the legacy APIs.
+
+### 7.1 Consumer Group 1: Legacy Static HTML Forms (`Nexucon-Main-Page`)
+* **Impacted Assets:** `contact.html` (`assets/js/contact-form.js`), `sap-business-one.html` (`assets/js/sap-landing-form.js`).
+* **Historic Endpoints:** `POST /api/v1/contact/submit`, `POST /api/v1/sap-lead/submit`.
+* **Migration Steps:**
+  1. Re-point AJAX form submit URLs to the new unified endpoint: `POST https://nexucon.com/api/leads`.
+  2. Update JavaScript payload serializer:
+     - Map `organisation` / `companyName` to `company`.
+     - Map `services` array to primary `serviceInterest`.
+     - Retain Cloudflare Turnstile token as `turnstileToken`.
+     - Embed `attribution` object containing captured UTM parameters and `landingPage`.
+  3. Verify client-side error handling parses the standard error envelope `{ success: false, errors: [...] }`.
+  4. Once Next.js page replacements (`/contact`, `/services/sap`) are deployed, configure Cloudflare edge redirects from legacy `.html` URLs to clean Next.js paths.
+
+### 7.2 Consumer Group 2: Legacy Careers React SPA (`Nexucon-Main-Page/careers`)
+* **Impacted Assets:** Vite React application in `Nexucon-Main-Page/careers/assets/` (`JobListing-*.js`, `JobDetails-*.js`, `FresherJobApplicationForm-*.js`, `ExperienceJobApplicationForm-*.js`).
+* **Historic Endpoints:** `GET /job-posting/display`, `POST /application-posting/create-fresher-application`, `POST /application-posting/create-experienced-application`.
+* **Migration Steps:**
+  1. Replace the legacy client-side rendered SPA with Next.js App Router native pages under `app/(careers)/*`.
+  2. Point job feed queries to `GET /api/careers/jobs`.
+  3. Consolidate separate Fresher and Experienced submission handlers into the unified multipart endpoint: `POST /api/careers/apply`.
+  4. Enforce client-side file check: accept `.pdf` and `.docx` up to 5 MB; reject other extensions prior to network dispatch.
+  5. Decommission the standalone Vite build and remove the `/careers` static subfolder.
+
+### 7.3 Consumer Group 3: Prototype Next.js Administration UI (`nexucon.com`)
+* **Impacted Assets:** `app/admin/*`, `app/login/page.tsx`, `components/admin/*`.
+* **Historic Endpoints:** `POST /api/auth/login`, `POST /api/content`, `POST /admin/save-settings`, `POST /admin/create-user`, `POST /api/upload`.
+* **Migration Steps:**
+  1. Export existing MongoDB `ContentPageModel` and `SiteSettingsModel` JSON documents.
+  2. Seed content into Strapi 5 Content Manager collections (`api::page.page`, `api::service.service`, `api::global-setting.global-setting`).
+  3. Redirect content authoring bookmarks to the Strapi Admin portal (`https://cms.nexucon.com/admin`).
+  4. Delete prototype route directories: `app/admin`, `app/login`, `app/api/auth`, `app/api/content`, `app/api/upload`, `app/api/analytics`.
+  5. Configure Next.js middleware to intercept any incoming requests to `/admin/*` and respond with HTTP `410 Gone`.
+
+---
+
+## 8. Change Log & Revision History
+
+| Version | Date | Author | Description of Changes |
+| :--- | :--- | :--- | :--- |
+| **v1.0** | 2026-09-23 | Lead Backend Architect | Initial API Retirement Plan detailing decommissioning schedules for 9 legacy prototype routes. |
+| **v1.1** | 2026-09-23 | Principal API Architect | **Contract Consistency Review & Reconciliation:**<br>1. Updated document status to `Draft for Backend, Frontend, Integration, Security, and QA Review`.<br>2. Harmonized HTTP decommissioning status codes: confirmed `410 Gone` for all prototype auth, content, upload, analytics, and admin endpoints.<br>3. Added Section 7: "Consumer Migration & Cutover Playbook" detailing transition steps and payload adaptations for Legacy Static HTML Forms, Careers React SPA, and Prototype Admin UI.<br>4. Reclassified target replacements from `[APPROVED-TARGET]` to `[PROPOSED]`. |

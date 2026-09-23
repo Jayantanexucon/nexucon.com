@@ -4,8 +4,9 @@ info:
   description: >
     Implementation-ready API specification contract for the Nexucon Company Website,
     Decoupled Careers Engine, Headless Marketing CMS (Strapi 5), and Corporate Integration Adapters.
-    Classification strictly enforced: [VERIFIED-AS-IS], [APPROVED-TARGET], [PROPOSED], [EXAMPLE-ONLY], [TBD].
-  version: 1.0.0
+    Status: Draft for Backend, Frontend, Integration, Security, and QA Review.
+    Classification strictly enforced: [VERIFIED-AS-IS], [APPROVED-TARGET], [PROPOSED], [EXAMPLE-ONLY], [TBD WITH OWNER].
+  version: 1.1.0
   contact:
     name: Nexucon Solution Architecture & Engineering Team
     email: architecture@nexucon.com
@@ -28,6 +29,8 @@ tags:
     description: Strapi 5 ISR cache revalidation and draft preview mode toggling.
   - name: External Integrations
     description: Enterprise connectors for Corporate ATS and CRM platforms.
+  - name: Marketing Headless CMS (Strapi 5)
+    description: Strapi 5 managed Content APIs consumed server-side by Next.js React Server Components.
   - name: Decommissioned Legacy Routes
     description: Retired prototype endpoints returning HTTP 410 Gone or 308 Permanent Redirect.
 
@@ -36,7 +39,7 @@ paths:
     post:
       tags:
         - Public Leads & Contact
-      summary: Inbound Lead & Contact Submission [APPROVED-TARGET]
+      summary: Inbound Lead & Contact Submission [PROPOSED]
       description: >
         Ingests general contact enquiries, SAP consultation requests, and campaign landing page submissions.
         Enforces Cloudflare Turnstile anti-bot verification, validates payload with Zod, checks idempotency hash,
@@ -84,7 +87,7 @@ paths:
     get:
       tags:
         - Careers Engine
-      summary: Public Job Requisition Feed [APPROVED-TARGET]
+      summary: Public Job Requisition Feed [PROPOSED]
       description: >
         Returns published, active career opportunities with multi-attribute filtering and pagination.
         Cached at edge with Next.js ISR tag 'careers-list'.
@@ -135,7 +138,7 @@ paths:
     get:
       tags:
         - Careers Engine
-      summary: Public Job Requisition Detail [APPROVED-TARGET]
+      summary: Public Job Requisition Detail [PROPOSED]
       description: >
         Returns detailed job description, responsibilities, requirements, and Schema.org JobPosting JSON-LD.
       operationId: getCareerJobBySlug
@@ -164,7 +167,7 @@ paths:
     post:
       tags:
         - Careers Engine
-      summary: Candidate Application & Resume Submission [APPROVED-TARGET]
+      summary: Candidate Application & Resume Submission [PROPOSED]
       description: >
         Receives candidate application data and resume document. Performs in-memory binary magic byte verification
         (PDF/DOCX, max 5MB), stores file in private Azure Blob container 'resumes-private', saves candidate
@@ -212,10 +215,10 @@ paths:
     get:
       tags:
         - Careers Administration
-      summary: Authorized Resume Download SAS Generator [APPROVED-TARGET]
+      summary: Authorized Resume Download SAS Generator [PROPOSED]
       description: >
         Generates a temporary, 15-minute Azure Shared Access Signature (SAS) download URL for authorized
-        recruitment staff. Requires Microsoft Entra ID authentication with Recruiter role.
+        recruitment staff. Requires Microsoft Entra ID authentication with Nexucon.Recruiter role.
       operationId: getResumeDownloadUrl
       security:
         - EntraIdBearerAuth: []
@@ -240,7 +243,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardErrorEnvelope'
         '403':
-          description: User lacks Recruiter / Recruitment_Admin role.
+          description: User lacks Nexucon.Recruiter / Nexucon.RecruitmentAdmin role.
           content:
             application/json:
               schema:
@@ -256,7 +259,7 @@ paths:
     post:
       tags:
         - CMS Webhooks & Preview
-      summary: On-Demand Cache Revalidation Webhook [APPROVED-TARGET]
+      summary: On-Demand Cache Revalidation Webhook [PROPOSED]
       description: >
         Webhook triggered by Strapi 5 upon content publishing, modification, or unpublishing.
         Purges Next.js tag-based ISR caches instantly.
@@ -287,7 +290,7 @@ paths:
     get:
       tags:
         - CMS Webhooks & Preview
-      summary: Next.js Draft Mode Preview Toggle [APPROVED-TARGET]
+      summary: Next.js Draft Mode Preview Toggle [PROPOSED]
       description: >
         Enables Next.js Draft Mode and redirects to content slug with preview cookie enabled.
       operationId: enableDraftMode
@@ -322,11 +325,13 @@ paths:
     post:
       tags:
         - External Integrations
-      summary: ATS Inbound Job Requisition Webhook [APPROVED-TARGET]
+      summary: ATS Inbound Job Requisition Webhook [PROPOSED CONTRACT - PENDING ATS OWNER SIGN-OFF]
       description: >
         Ingests requisition lifecycle events (create, update, close) from Nexucon Corporate ATS.
         Secured with HMAC-SHA256 signature in X-Nexucon-ATS-Signature header.
       operationId: syncAtsJobWebhook
+      security:
+        - AtsHmacAuth: []
       parameters:
         - name: X-Nexucon-ATS-Signature
           in: header
@@ -366,11 +371,106 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardErrorEnvelope'
 
+  /api/global-setting:
+    get:
+      tags:
+        - Marketing Headless CMS (Strapi 5)
+      summary: Fetch Global Site Settings [PROPOSED]
+      description: Managed Strapi 5 Single Type API (`api::global-setting.global-setting`) returning site branding, navigation, and SEO fallbacks.
+      operationId: getGlobalSettings
+      security:
+        - StrapiTokenAuth: []
+      responses:
+        '200':
+          description: Site settings data object.
+
+  /api/pages:
+    get:
+      tags:
+        - Marketing Headless CMS (Strapi 5)
+      summary: Fetch Marketing Landing Pages [PROPOSED]
+      description: Managed Strapi 5 Collection Type API (`api::page.page`) returning dynamic sections and SEO metadata by slug.
+      operationId: getPages
+      security:
+        - StrapiTokenAuth: []
+      parameters:
+        - name: filters[slug][$eq]
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: populate
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Page collection or single entry.
+
+  /api/services:
+    get:
+      tags:
+        - Marketing Headless CMS (Strapi 5)
+      summary: Fetch Services & Capabilities [PROPOSED]
+      description: Managed Strapi 5 Collection Type API (`api::service.service`) returning enterprise service practice details.
+      operationId: getServices
+      security:
+        - StrapiTokenAuth: []
+      parameters:
+        - name: filters[slug][$eq]
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Service collection or detail entry.
+
+  /api/blogs:
+    get:
+      tags:
+        - Marketing Headless CMS (Strapi 5)
+      summary: Fetch Insights & Blog Articles [PROPOSED]
+      description: Managed Strapi 5 Collection Type API (`api::blog.blog`) returning thought leadership articles.
+      operationId: getBlogs
+      security:
+        - StrapiTokenAuth: []
+      responses:
+        '200':
+          description: Blog articles collection.
+
+  /api/case-studies:
+    get:
+      tags:
+        - Marketing Headless CMS (Strapi 5)
+      summary: Fetch Client Transformation Case Studies [PROPOSED]
+      description: Managed Strapi 5 Collection Type API (`api::case-study.case-study`) returning enterprise case studies and impact metrics.
+      operationId: getCaseStudies
+      security:
+        - StrapiTokenAuth: []
+      responses:
+        '200':
+          description: Case studies collection.
+
+  /api/redirects:
+    get:
+      tags:
+        - Marketing Headless CMS (Strapi 5)
+      summary: Fetch Vanity Redirect Rules [PROPOSED]
+      description: Managed Strapi 5 Collection Type API (`api::redirect.redirect`) returning 301 redirection rules for Next.js middleware.
+      operationId: getRedirectRules
+      security:
+        - StrapiTokenAuth: []
+      responses:
+        '200':
+          description: List of redirect rules.
+
   /api/enquiries:
     post:
       tags:
         - Decommissioned Legacy Routes
-      summary: Legacy Enquiry Ingestion (Redirect) [VERIFIED-AS-IS] -> [APPROVED-TARGET]
+      summary: Legacy Enquiry Ingestion (Redirect) [VERIFIED-AS-IS / PROPOSED]
       description: Deprecated route redirecting to /api/leads with HTTP 308 Permanent Redirect.
       operationId: legacyEnquiriesRedirect
       responses:
@@ -381,7 +481,7 @@ paths:
     post:
       tags:
         - Decommissioned Legacy Routes
-      summary: Prototype Login Endpoint (Decommissioned) [VERIFIED-AS-IS]
+      summary: Prototype Login Endpoint (Decommissioned) [VERIFIED-AS-IS / PROPOSED]
       description: Retired prototype login handler. Returns HTTP 410 Gone.
       operationId: legacyAuthLogin
       responses:
@@ -396,7 +496,7 @@ paths:
     post:
       tags:
         - Decommissioned Legacy Routes
-      summary: Prototype Logout Endpoint (Decommissioned) [VERIFIED-AS-IS]
+      summary: Prototype Logout Endpoint (Decommissioned) [VERIFIED-AS-IS / PROPOSED]
       description: Retired prototype logout handler. Returns HTTP 410 Gone.
       operationId: legacyAuthLogout
       responses:
@@ -411,7 +511,7 @@ paths:
     get:
       tags:
         - Decommissioned Legacy Routes
-      summary: Prototype Content Fetch (Decommissioned) [VERIFIED-AS-IS]
+      summary: Prototype Content Fetch (Decommissioned) [VERIFIED-AS-IS / PROPOSED]
       description: Retired prototype content endpoint. Use Strapi 5 Content API. Returns HTTP 410 Gone.
       operationId: legacyGetContent
       responses:
@@ -424,7 +524,7 @@ paths:
     post:
       tags:
         - Decommissioned Legacy Routes
-      summary: Prototype Content Mutation (Decommissioned) [VERIFIED-AS-IS]
+      summary: Prototype Content Mutation (Decommissioned) [VERIFIED-AS-IS / PROPOSED]
       description: Retired prototype content mutation. Use Strapi Content Manager. Returns HTTP 410 Gone.
       operationId: legacyPostContent
       responses:
@@ -439,8 +539,8 @@ paths:
     post:
       tags:
         - Decommissioned Legacy Routes
-      summary: Prototype Disk Upload (Decommissioned) [VERIFIED-AS-IS]
-      description: Retired local disk upload handler. Public assets use Strapi Media Library. Resumes use /api/careers/apply.
+      summary: Prototype Disk Upload (Decommissioned) [VERIFIED-AS-IS / PROPOSED]
+      description: Retired local disk upload handler. Public assets use Strapi Media Library. Resumes use /api/careers/apply. Returns HTTP 410 Gone.
       operationId: legacyUpload
       responses:
         '410':
@@ -454,12 +554,42 @@ paths:
     post:
       tags:
         - Decommissioned Legacy Routes
-      summary: Prototype Database Analytics (Decommissioned) [VERIFIED-AS-IS]
-      description: Retired database analytics beacon. Client telemetry is tracked via GA4/GTM.
+      summary: Prototype Database Analytics (Decommissioned) [VERIFIED-AS-IS / PROPOSED]
+      description: Retired database analytics beacon. Client telemetry is tracked via GA4/GTM. Returns HTTP 410 Gone.
       operationId: legacyAnalytics
       responses:
         '410':
           description: Endpoint permanently retired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /admin/create-user:
+    post:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Prototype User Creation (Decommissioned) [VERIFIED-AS-IS / PROPOSED]
+      description: Retired prototype user creation handler in app/admin/create-user/route.ts. Returns HTTP 410 Gone.
+      operationId: legacyAdminCreateUser
+      responses:
+        '410':
+          description: Endpoint permanently retired. User provisioning handled via Microsoft Entra ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /admin/save-settings:
+    post:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Prototype Settings Override (Decommissioned) [VERIFIED-AS-IS / PROPOSED]
+      description: Retired prototype settings handler in app/admin/save-settings/route.ts. Returns HTTP 410 Gone.
+      operationId: legacyAdminSaveSettings
+      responses:
+        '410':
+          description: Endpoint permanently retired. Global settings managed via Strapi Single Type.
           content:
             application/json:
               schema:
@@ -476,6 +606,15 @@ components:
       type: http
       scheme: bearer
       description: Secret revalidation key configured between Strapi 5 Webhooks and Next.js BFF.
+    AtsHmacAuth:
+      type: apiKey
+      in: header
+      name: X-Nexucon-ATS-Signature
+      description: HMAC-SHA256 signature calculated over the request body and timestamp using the shared secret.
+    StrapiTokenAuth:
+      type: http
+      scheme: bearer
+      description: Strapi 5 Content API Read Bearer Token for Next.js Server Components.
 
   schemas:
     StandardSuccessEnvelope:
