@@ -1,0 +1,992 @@
+openapi: 3.1.0
+info:
+  title: Nexucon Website, Careers & CMS Platform API
+  description: >
+    Implementation-ready API specification contract for the Nexucon Company Website,
+    Decoupled Careers Engine, Headless Marketing CMS (Strapi 5), and Corporate Integration Adapters.
+    Classification strictly enforced: [VERIFIED-AS-IS], [APPROVED-TARGET], [PROPOSED], [EXAMPLE-ONLY], [TBD].
+  version: 1.0.0
+  contact:
+    name: Nexucon Solution Architecture & Engineering Team
+    email: architecture@nexucon.com
+servers:
+  - url: https://{environmentHost}
+    description: Configured Target Deployment Environment
+    variables:
+      environmentHost:
+        default: nexucon.com
+        description: Target hostname (e.g., nexucon.com, staging.nexucon.com, or localhost:3000)
+
+tags:
+  - name: Public Leads & Contact
+    description: Inbound business enquiries, SAP consultations, and landing page submissions.
+  - name: Careers Engine
+    description: Public job requisition discovery and candidate application ingestion.
+  - name: Careers Administration
+    description: Internal recruiter operations and secure candidate resume retrieval.
+  - name: CMS Webhooks & Preview
+    description: Strapi 5 ISR cache revalidation and draft preview mode toggling.
+  - name: External Integrations
+    description: Enterprise connectors for Corporate ATS and CRM platforms.
+  - name: Decommissioned Legacy Routes
+    description: Retired prototype endpoints returning HTTP 410 Gone or 308 Permanent Redirect.
+
+paths:
+  /api/leads:
+    post:
+      tags:
+        - Public Leads & Contact
+      summary: Inbound Lead & Contact Submission [APPROVED-TARGET]
+      description: >
+        Ingests general contact enquiries, SAP consultation requests, and campaign landing page submissions.
+        Enforces Cloudflare Turnstile anti-bot verification, validates payload with Zod, checks idempotency hash,
+        persists to PostgreSQL transactional outbox, and queues dispatch to corporate CRM.
+      operationId: submitLead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadSubmissionRequest'
+      responses:
+        '201':
+          description: Lead successfully accepted and queued for CRM dispatch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadSuccessResponse'
+        '400':
+          description: Validation failure or missing Turnstile token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '403':
+          description: Cloudflare Turnstile anti-bot verification failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '409':
+          description: Duplicate lead submission detected within 5-minute idempotency window.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '429':
+          description: Rate limit exceeded (maximum 5 requests per 10 minutes per IP).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/careers/jobs:
+    get:
+      tags:
+        - Careers Engine
+      summary: Public Job Requisition Feed [APPROVED-TARGET]
+      description: >
+        Returns published, active career opportunities with multi-attribute filtering and pagination.
+        Cached at edge with Next.js ISR tag 'careers-list'.
+      operationId: getCareerJobs
+      parameters:
+        - name: practiceArea
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["SAP Modernization", "Cloud Architecture", "Data & AI", "Digital Transformation", "Staff Augmentation"]
+          description: Filter by Nexucon practice area.
+        - name: location
+          in: query
+          required: false
+          schema:
+            type: string
+          example: London, UK
+        - name: employmentType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Full-Time, Part-Time, Contract]
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: List of active job requisitions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListResponse'
+
+  /api/careers/jobs/{slug}:
+    get:
+      tags:
+        - Careers Engine
+      summary: Public Job Requisition Detail [APPROVED-TARGET]
+      description: >
+        Returns detailed job description, responsibilities, requirements, and Schema.org JobPosting JSON-LD.
+      operationId: getCareerJobBySlug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          example: principal-sap-s4hana-architect
+      responses:
+        '200':
+          description: Job requisition details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobDetailResponse'
+        '404':
+          description: Job requisition not found or closed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/careers/apply:
+    post:
+      tags:
+        - Careers Engine
+      summary: Candidate Application & Resume Submission [APPROVED-TARGET]
+      description: >
+        Receives candidate application data and resume document. Performs in-memory binary magic byte verification
+        (PDF/DOCX, max 5MB), stores file in private Azure Blob container 'resumes-private', saves candidate
+        record to Careers database, and schedules ATS candidate sync.
+      operationId: submitCandidateApplication
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CandidateApplicationFormData'
+      responses:
+        '201':
+          description: Application successfully submitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationSuccessResponse'
+        '400':
+          description: Missing required fields or consent omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '409':
+          description: Candidate has already applied to this position in the last 30 days.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '413':
+          description: Resume file exceeds 5,242,880 bytes limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '415':
+          description: Unsupported file format or magic byte mismatch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/careers/admin/applications/{id}/resume-url:
+    get:
+      tags:
+        - Careers Administration
+      summary: Authorized Resume Download SAS Generator [APPROVED-TARGET]
+      description: >
+        Generates a temporary, 15-minute Azure Shared Access Signature (SAS) download URL for authorized
+        recruitment staff. Requires Microsoft Entra ID authentication with Recruiter role.
+      operationId: getResumeDownloadUrl
+      security:
+        - EntraIdBearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: app_01HZP876
+      responses:
+        '200':
+          description: Temporary download URL successfully generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeSasResponse'
+        '401':
+          description: Unauthenticated request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '403':
+          description: User lacks Recruiter / Recruitment_Admin role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '404':
+          description: Application or resume file not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/revalidate:
+    post:
+      tags:
+        - CMS Webhooks & Preview
+      summary: On-Demand Cache Revalidation Webhook [APPROVED-TARGET]
+      description: >
+        Webhook triggered by Strapi 5 upon content publishing, modification, or unpublishing.
+        Purges Next.js tag-based ISR caches instantly.
+      operationId: revalidateCmsCache
+      security:
+        - RevalidationSecretAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StrapiRevalidationPayload'
+      responses:
+        '200':
+          description: Tag cache successfully purged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevalidationResponse'
+        '401':
+          description: Invalid revalidation authorization secret.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/draft:
+    get:
+      tags:
+        - CMS Webhooks & Preview
+      summary: Next.js Draft Mode Preview Toggle [APPROVED-TARGET]
+      description: >
+        Enables Next.js Draft Mode and redirects to content slug with preview cookie enabled.
+      operationId: enableDraftMode
+      parameters:
+        - name: secret
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: slug
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [page, service, blog, case-study]
+      responses:
+        '307':
+          description: Temporary redirect to content page with preview cookie set.
+        '401':
+          description: Invalid preview secret token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/integrations/ats/jobs:
+    post:
+      tags:
+        - External Integrations
+      summary: ATS Inbound Job Requisition Webhook [APPROVED-TARGET]
+      description: >
+        Ingests requisition lifecycle events (create, update, close) from Nexucon Corporate ATS.
+        Secured with HMAC-SHA256 signature in X-Nexucon-ATS-Signature header.
+      operationId: syncAtsJobWebhook
+      parameters:
+        - name: X-Nexucon-ATS-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: HMAC-SHA256 signature of request body using shared secret.
+        - name: X-Nexucon-ATS-Timestamp
+          in: header
+          required: true
+          schema:
+            type: integer
+          description: Unix timestamp in seconds to prevent replay attacks (tolerance 300s).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtsJobWebhookPayload'
+      responses:
+        '200':
+          description: Requisition successfully synchronized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardSuccessEnvelope'
+        '401':
+          description: Invalid HMAC signature or missing credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+        '400':
+          description: Timestamp skew exceeded 300 seconds or malformed payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/enquiries:
+    post:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Legacy Enquiry Ingestion (Redirect) [VERIFIED-AS-IS] -> [APPROVED-TARGET]
+      description: Deprecated route redirecting to /api/leads with HTTP 308 Permanent Redirect.
+      operationId: legacyEnquiriesRedirect
+      responses:
+        '308':
+          description: Permanent redirect to /api/leads.
+
+  /api/auth/login:
+    post:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Prototype Login Endpoint (Decommissioned) [VERIFIED-AS-IS]
+      description: Retired prototype login handler. Returns HTTP 410 Gone.
+      operationId: legacyAuthLogin
+      responses:
+        '410':
+          description: Endpoint permanently retired. Use Microsoft Entra ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Prototype Logout Endpoint (Decommissioned) [VERIFIED-AS-IS]
+      description: Retired prototype logout handler. Returns HTTP 410 Gone.
+      operationId: legacyAuthLogout
+      responses:
+        '410':
+          description: Endpoint permanently retired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/content:
+    get:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Prototype Content Fetch (Decommissioned) [VERIFIED-AS-IS]
+      description: Retired prototype content endpoint. Use Strapi 5 Content API. Returns HTTP 410 Gone.
+      operationId: legacyGetContent
+      responses:
+        '410':
+          description: Endpoint permanently retired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+    post:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Prototype Content Mutation (Decommissioned) [VERIFIED-AS-IS]
+      description: Retired prototype content mutation. Use Strapi Content Manager. Returns HTTP 410 Gone.
+      operationId: legacyPostContent
+      responses:
+        '410':
+          description: Endpoint permanently retired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/upload:
+    post:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Prototype Disk Upload (Decommissioned) [VERIFIED-AS-IS]
+      description: Retired local disk upload handler. Public assets use Strapi Media Library. Resumes use /api/careers/apply.
+      operationId: legacyUpload
+      responses:
+        '410':
+          description: Local upload disabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+  /api/analytics:
+    post:
+      tags:
+        - Decommissioned Legacy Routes
+      summary: Prototype Database Analytics (Decommissioned) [VERIFIED-AS-IS]
+      description: Retired database analytics beacon. Client telemetry is tracked via GA4/GTM.
+      operationId: legacyAnalytics
+      responses:
+        '410':
+          description: Endpoint permanently retired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+
+components:
+  securitySchemes:
+    EntraIdBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Microsoft Entra ID OAuth 2.0 / OIDC Bearer Token for internal staff.
+    RevalidationSecretAuth:
+      type: http
+      scheme: bearer
+      description: Secret revalidation key configured between Strapi 5 Webhooks and Next.js BFF.
+
+  schemas:
+    StandardSuccessEnvelope:
+      type: object
+      required:
+        - success
+        - correlationId
+        - message
+        - data
+        - errors
+      properties:
+        success:
+          type: boolean
+          example: true
+        correlationId:
+          type: string
+          example: req_01HXYZ7890ABCDEF12345678
+        message:
+          type: string
+          example: Operation completed successfully.
+        data:
+          type: object
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+          example: []
+
+    StandardErrorEnvelope:
+      type: object
+      required:
+        - success
+        - correlationId
+        - message
+        - data
+        - errors
+      properties:
+        success:
+          type: boolean
+          example: false
+        correlationId:
+          type: string
+          example: req_01HXYZ7890ABCDEF12345678
+        message:
+          type: string
+          example: Validation failed on the submitted payload.
+        data:
+          type: object
+          nullable: true
+          example: null
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+
+    ErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        field:
+          type: string
+          example: email
+        code:
+          type: string
+          example: LEAD-EMAIL-INVALID-005
+        message:
+          type: string
+          example: Please provide a valid business email address.
+
+    LeadSubmissionRequest:
+      type: object
+      required:
+        - turnstileToken
+        - fullName
+        - email
+        - message
+      properties:
+        turnstileToken:
+          type: string
+          description: Cloudflare Turnstile anti-bot token.
+          example: 0.X.ABCDEF123456...
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane.doe@enterprise.com
+        company:
+          type: string
+          maxLength: 120
+          example: Acme Global Enterprises
+        phone:
+          type: string
+          description: International phone number in E.164 format.
+          example: "+442079460958"
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2 code or country name.
+          example: United Kingdom
+        serviceInterest:
+          type: string
+          enum: ["Enterprise - SAP", "Cloud Services", "Data Analytics", "Applications Services", "Staff Augmentation"]
+          example: Enterprise - SAP
+        message:
+          type: string
+          minLength: 10
+          maxLength: 2000
+          example: Requesting enterprise consultation regarding SAP S/4HANA migration timeline and staffing.
+        sapDetails:
+          $ref: '#/components/schemas/SapConsultationDetails'
+        attribution:
+          $ref: '#/components/schemas/MarketingAttribution'
+
+    SapConsultationDetails:
+      type: object
+      properties:
+        companySize:
+          type: string
+          enum: ["1-10", "11-50", "51-200", "201-500", "500+"]
+          example: "51-200"
+        city:
+          type: string
+          example: London
+        service:
+          type: string
+          default: "SAP Business ERP"
+
+    MarketingAttribution:
+      type: object
+      properties:
+        utmSource:
+          type: string
+          example: linkedin
+        utmMedium:
+          type: string
+          example: paid-social
+        utmCampaign:
+          type: string
+          example: sap-q4-accelerator
+        utmTerm:
+          type: string
+          example: enterprise-sap
+        utmContent:
+          type: string
+          example: banner-ad-3
+        landingPage:
+          type: string
+          example: https://nexucon.com/services/sap
+        referrer:
+          type: string
+          example: https://www.linkedin.com/
+
+    LeadSuccessResponse:
+      type: object
+      required:
+        - success
+        - correlationId
+        - message
+        - data
+        - errors
+      properties:
+        success:
+          type: boolean
+          example: true
+        correlationId:
+          type: string
+          example: lead_01HZY98A7B6C
+        message:
+          type: string
+          example: Enquiry received. An enterprise architect will respond within 24 hours.
+        data:
+          type: object
+          properties:
+            leadId:
+              type: string
+              example: lead_01HZY98A7B6C
+            status:
+              type: string
+              example: RECEIVED
+        errors:
+          type: array
+          example: []
+
+    JobListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        correlationId:
+          type: string
+          example: car_01A89F
+        message:
+          type: string
+          example: Active jobs retrieved.
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 12
+            page:
+              type: integer
+              example: 1
+            pageSize:
+              type: integer
+              example: 10
+            jobs:
+              type: array
+              items:
+                $ref: '#/components/schemas/JobSummary'
+
+    JobSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          example: req_01HPX7
+        jobId:
+          type: string
+          example: NEX-SAP-0042
+        title:
+          type: string
+          example: Principal SAP S/4HANA Solution Architect
+        slug:
+          type: string
+          example: principal-sap-s4hana-architect
+        practiceArea:
+          type: string
+          example: SAP Modernization
+        location:
+          type: string
+          example: London, UK
+        remotePolicy:
+          type: string
+          example: Hybrid
+        employmentType:
+          type: string
+          example: Full-Time
+        experienceLevel:
+          type: string
+          example: 10+ Years
+        publishedAt:
+          type: string
+          format: date-time
+          example: 2026-09-20T09:00:00Z
+        closingDate:
+          type: string
+          format: date-time
+          example: 2026-10-31T23:59:59Z
+
+    JobDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        correlationId:
+          type: string
+          example: car_01A89F
+        message:
+          type: string
+          example: Job details retrieved.
+        data:
+          type: object
+          properties:
+            job:
+              $ref: '#/components/schemas/JobDetail'
+            structuredDataJsonLd:
+              type: object
+              description: Schema.org JobPosting compliant JSON-LD object.
+
+    JobDetail:
+      allOf:
+        - $ref: '#/components/schemas/JobSummary'
+        - type: object
+          properties:
+            jobDetails:
+              type: string
+              example: Nexucon is seeking an enterprise SAP S/4HANA architect...
+            jobResponsibilities:
+              type: array
+              items:
+                type: string
+            jobRequirements:
+              type: array
+              items:
+                type: string
+            skillRequired:
+              type: array
+              items:
+                type: string
+            salaryRange:
+              type: string
+              example: Competitive Enterprise Package
+            benefits:
+              type: array
+              items:
+                type: string
+
+    CandidateApplicationFormData:
+      type: object
+      required:
+        - jobId
+        - firstName
+        - lastName
+        - email
+        - phoneNumber
+        - consentDataProcessing
+        - turnstileToken
+        - resume
+      properties:
+        jobId:
+          type: string
+          example: req_01HPX7
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Smith
+        email:
+          type: string
+          format: email
+          example: john.smith@domain.com
+        phoneNumber:
+          type: string
+          example: "+442079460123"
+        jobRole:
+          type: string
+          example: SAP Architect
+        yearsOfExperience:
+          type: integer
+          example: 8
+        releventYearsOfExperience:
+          type: integer
+          example: 6
+        currentCTC:
+          type: number
+          example: 85000
+        currentCTCCurrency:
+          type: string
+          enum: [INR, USD, GBP, EUR, SAR, AED]
+          example: GBP
+        expectedCTC:
+          type: number
+          example: 95000
+        expectedCTCCurrency:
+          type: string
+          enum: [INR, USD, GBP, EUR, SAR, AED]
+          example: GBP
+        noticePeriod:
+          type: string
+          example: 30 Days
+        linkedinUrl:
+          type: string
+          format: uri
+          example: https://linkedin.com/in/johnsmith
+        consentDataProcessing:
+          type: boolean
+          example: true
+        turnstileToken:
+          type: string
+          example: 0.X.ABCDEF...
+        resume:
+          type: string
+          format: binary
+          description: Candidate resume document. Max 5,242,880 bytes. Allowed formats PDF (%PDF-) or DOCX (PK\x03\x04).
+
+    ApplicationSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        correlationId:
+          type: string
+          example: app_01HZP876
+        message:
+          type: string
+          example: Your application has been received successfully.
+        data:
+          type: object
+          properties:
+            applicationId:
+              type: string
+              example: app_01HZP876
+            status:
+              type: string
+              example: SUBMITTED
+            timestamp:
+              type: string
+              format: date-time
+
+    ResumeSasResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        correlationId:
+          type: string
+          example: sas_0912BC
+        message:
+          type: string
+          example: Temporary resume download URL generated.
+        data:
+          type: object
+          properties:
+            downloadUrl:
+              type: string
+              format: uri
+              example: https://<storage-account>.blob.core.windows.net/resumes-private/2026/09/uuid.pdf?sp=r&st=...&se=...&spr=https&sig=...
+            expiresAt:
+              type: string
+              format: date-time
+              example: 2026-09-23T20:45:00Z
+
+    StrapiRevalidationPayload:
+      type: object
+      required:
+        - event
+        - model
+      properties:
+        event:
+          type: string
+          enum: ["entry.publish", "entry.unpublish", "entry.update", "entry.delete", "media.create", "media.update"]
+          example: entry.publish
+        model:
+          type: string
+          enum: [page, service, blog, case-study, global-setting]
+          example: service
+        entry:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 14
+            slug:
+              type: string
+              example: sap-modernization
+            tags:
+              type: array
+              items:
+                type: string
+              example: ["sap", "services"]
+
+    RevalidationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        correlationId:
+          type: string
+          example: rev_89AB12CD
+        message:
+          type: string
+          example: Cache successfully purged for tags ['services', 'service-sap-modernization']
+        data:
+          type: object
+          properties:
+            revalidated:
+              type: boolean
+              example: true
+            timestamp:
+              type: string
+              format: date-time
+
+    AtsJobWebhookPayload:
+      type: object
+      required:
+        - event
+        - externalRequisitionId
+        - title
+        - status
+      properties:
+        event:
+          type: string
+          enum: [JOB_REQUISITION_CREATED, JOB_REQUISITION_UPDATED, JOB_REQUISITION_CLOSED]
+          example: JOB_REQUISITION_UPDATED
+        externalRequisitionId:
+          type: string
+          example: ATS-REQ-2026-881
+        title:
+          type: string
+          example: Senior AI Platforms Engineer
+        status:
+          type: string
+          enum: [OPEN, CLOSED, DRAFT]
+          example: OPEN
+        practiceArea:
+          type: string
+          example: Data & AI
+        location:
+          type: string
+          example: London / Remote
+        jobDescriptionHtml:
+          type: string
+          example: <p>Nexucon is expanding its AI practice...</p>
+        requirements:
+          type: array
+          items:
+            type: string
+          example: ["Python", "PyTorch", "Kubernetes", "Azure AI"]
+        closingDate:
+          type: string
+          format: date-time
+          example: 2026-11-15T23:59:59Z
